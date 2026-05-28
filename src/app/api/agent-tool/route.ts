@@ -49,8 +49,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const result = await handlers[tool as AdminToolName](args as any, ctx);
-    return NextResponse.json(result);
+    return runTool(tool, () => handlers[tool as AdminToolName](args as any, ctx));
   }
 
   const handlers = CUSTOMER_HANDLERS as Record<string, (a: any, c: any) => Promise<any>>;
@@ -60,6 +59,19 @@ export async function POST(req: Request) {
       { status: 400 }
     );
   }
-  const result = await handlers[tool as CustomerToolName](args as any, ctx);
-  return NextResponse.json(result);
+  return runTool(tool, () => handlers[tool as CustomerToolName](args as any, ctx));
+}
+
+// Never let a handler throw an unhandled 500 — surface a clean error to the
+// model and log the real cause (e.g. a DB connection failure) for the server logs.
+async function runTool(tool: string, fn: () => Promise<any>) {
+  try {
+    return NextResponse.json(await fn());
+  } catch (err) {
+    console.error(`[agent-tool] '${tool}' failed:`, err);
+    return NextResponse.json(
+      { ok: false, error: "That request couldn't be completed right now." },
+      { status: 200 }
+    );
+  }
 }
