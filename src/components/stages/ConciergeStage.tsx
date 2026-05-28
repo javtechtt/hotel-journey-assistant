@@ -10,29 +10,6 @@ import type { LobbyMessageWire, MenuItemWire, OrderWire, ReservationWire } from 
 
 const ORDER_FLOW: Array<OrderWire["status"]> = ["RECEIVED", "PREPARING", "EN_ROUTE", "DELIVERED"];
 
-function itemIcon(item: MenuItemWire): IconName {
-  if (item.slug.includes("towel")) return "towel";
-  if (item.slug.includes("shuttle")) return "car";
-  if (item.slug.includes("spa")) return "lotus";
-  if (item.slug.includes("housekeeping")) return "broom";
-  switch (item.category) {
-    case "BREAKFAST":
-      return "coffee";
-    case "DRINK":
-      return "glass";
-    case "DINNER":
-      return "bell";
-    case "HOUSEKEEPING":
-      return "broom";
-    case "CONCIERGE":
-      return "car";
-    case "SPA":
-      return "lotus";
-    default:
-      return "sparkle";
-  }
-}
-
 export function ConciergeStage({
   reservation,
   menu,
@@ -79,7 +56,7 @@ export function ConciergeStage({
               whileHover={{ y: -4 }}
               className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]"
             >
-              <MenuItemImage slug={m.slug} icon={itemIcon(m)} className="h-24 w-full" />
+              <MenuItemImage slug={m.slug} category={m.category} className="h-24 w-full" />
               <div className="p-4">
                 <div className="font-display text-base leading-tight text-sand-100">{m.name}</div>
                 <div className="mt-2 text-sm">
