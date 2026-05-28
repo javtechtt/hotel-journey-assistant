@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { ADMIN_TOOLS } from "@/lib/agent-tools";
 import { ADMIN_AGENT_INSTRUCTIONS } from "@/lib/agent-prompts";
 import { createRealtimeClientSecret } from "@/lib/realtime-session";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,12 +21,8 @@ export async function POST(req: Request) {
     );
   }
 
-  const adminPin = process.env.ADMIN_PIN;
-  if (adminPin) {
-    const provided = req.headers.get("x-admin-pin");
-    if (provided !== adminPin) {
-      return NextResponse.json({ error: "Admin PIN required." }, { status: 401 });
-    }
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Admin PIN required." }, { status: 401 });
   }
 
   const result = await createRealtimeClientSecret({

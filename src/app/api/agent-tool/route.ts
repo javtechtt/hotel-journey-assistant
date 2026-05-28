@@ -5,6 +5,7 @@ import {
   type CustomerToolName,
   type AdminToolName
 } from "@/lib/tool-handlers";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,15 +33,11 @@ export async function POST(req: Request) {
   }
 
   if (agent === "admin") {
-    const adminPin = process.env.ADMIN_PIN;
-    if (adminPin) {
-      const provided = req.headers.get("x-admin-pin");
-      if (provided !== adminPin) {
-        return NextResponse.json(
-          { ok: false, error: "Admin PIN required." },
-          { status: 401 }
-        );
-      }
+    if (!isAdminAuthorized(req)) {
+      return NextResponse.json(
+        { ok: false, error: "Admin PIN required." },
+        { status: 401 }
+      );
     }
     const handlers = ADMIN_HANDLERS as Record<string, (a: any, c: any) => Promise<any>>;
     if (!(tool in handlers)) {

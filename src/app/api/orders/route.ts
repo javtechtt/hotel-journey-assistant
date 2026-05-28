@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { update_order_status } from "@/lib/tool-handlers";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,8 +34,7 @@ export async function PATCH(req: Request) {
   if (!body.order_id || !body.status) {
     return NextResponse.json({ error: "order_id and status required" }, { status: 400 });
   }
-  const adminPin = process.env.ADMIN_PIN;
-  if (adminPin && req.headers.get("x-admin-pin") !== adminPin) {
+  if (!isAdminAuthorized(req)) {
     return NextResponse.json({ error: "Admin PIN required" }, { status: 401 });
   }
   const result = await update_order_status({ order_id: body.order_id, status: body.status });

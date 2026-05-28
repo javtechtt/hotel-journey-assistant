@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
-  const adminPin = process.env.ADMIN_PIN;
-  if (adminPin && req.headers.get("x-admin-pin") !== adminPin) {
+  if (!isAdminAuthorized(req)) {
     return NextResponse.json({ error: "Admin PIN required" }, { status: 401 });
   }
 
