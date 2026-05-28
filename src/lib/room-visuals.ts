@@ -60,15 +60,16 @@ export function roomVisual(slug?: string | null): RoomVisual {
   return MAP[slug] ?? FALLBACK;
 }
 
-// Whether real room photos are layered over the procedural art.
-export const ROOM_IMAGES_ENABLED = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES === "1";
+// Real room photos are layered over the procedural art by default; set
+// NEXT_PUBLIC_USE_ROOM_IMAGES=0 to force art-only.
+export const ROOM_IMAGES_ENABLED = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES !== "0";
 
 // How many photos exist per room type in /public/rooms. The first is
 // `<slug>.webp`; the rest are `<slug>2.webp`, `<slug>3.webp`, … .
 const PHOTO_COUNTS: Record<string, number> = {
-  "ocean-view-suite": 1,
+  "ocean-view-suite": 3,
   "garden-king-room": 3,
-  "executive-business-suite": 2,
+  "executive-business-suite": 3,
   "family-villa": 4
 };
 

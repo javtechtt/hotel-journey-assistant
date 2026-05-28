@@ -123,16 +123,6 @@ function FocusedRoom({
 }) {
   const v = roomVisual(rt.slug);
   const photos = roomPhotos(rt.slug);
-  const [idx, setIdx] = useState(0);
-  const [paused, setPaused] = useState(false);
-
-  // Gently cycle through the room's photos so a guest sees the whole gallery
-  // even hands-free; manual selection pins the chosen image.
-  useEffect(() => {
-    if (photos.length < 2 || paused) return;
-    const t = setInterval(() => setIdx((i) => (i + 1) % photos.length), 4000);
-    return () => clearInterval(t);
-  }, [photos.length, paused]);
 
   return (
     <motion.div
@@ -144,52 +134,18 @@ function FocusedRoom({
       className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] ring-1 ring-gold-400/40 shadow-[0_60px_140px_-40px_rgba(0,0,0,0.85)]"
     >
       <div className="relative h-[58vh] max-h-[560px]">
-        <AnimatePresence initial={false}>
-          <motion.div
-            key={photos[idx] ?? "scene"}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.7 }}
-            className="absolute inset-0"
-          >
-            <RoomScene slug={rt.slug} image={photos[idx]} scrim="full" />
-          </motion.div>
-        </AnimatePresence>
-
-        {photos.length > 1 && (
-          <div className="absolute left-4 top-4 z-10 flex gap-2">
-            {photos.map((src, i) => (
-              <button
-                key={src}
-                onClick={() => {
-                  setIdx(i);
-                  setPaused(true);
-                }}
-                className={cn(
-                  "h-11 w-16 overflow-hidden rounded-lg border transition",
-                  i === idx
-                    ? "border-gold-300 ring-1 ring-gold-300/60"
-                    : "border-white/20 opacity-60 hover:opacity-100"
-                )}
-                aria-label={`View photo ${i + 1}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={src} alt="" aria-hidden className="h-full w-full object-cover" />
-              </button>
-            ))}
-          </div>
-        )}
+        <Coverflow photos={photos} slug={rt.slug} />
 
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/35 text-white/70 transition hover:text-white"
+          className="absolute right-4 top-4 z-20 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/35 text-white/70 transition hover:text-white"
           aria-label="Back to all rooms"
         >
           <Icon name="close" className="h-4 w-4" />
         </button>
 
-        <div className="absolute inset-x-0 bottom-0 p-7">
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-1/2 bg-gradient-to-t from-black/90 via-black/55 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 z-10 p-7">
           <div className={cn("text-[11px] uppercase tracking-luxe", v.accent)}>{rt.mood}</div>
           <h2 className="mt-2 font-display text-5xl leading-[0.9] text-sand-100">{rt.name}</h2>
 
@@ -232,6 +188,117 @@ function FocusedRoom({
         </div>
       </div>
     </motion.div>
+  );
+}
+
+// Cover Flow–style 3D carousel of a room's photos: the centred shot faces the
+// viewer; neighbours angle back and recede. Auto-advances, with swipe, tap a
+// neighbour, or the dots to navigate. Falls back to the SVG scene if a room
+// has no photos.
+function Coverflow({ photos, slug }: { photos: string[]; slug: string }) {
+  const [active, setActive] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const n = photos.length;
+
+  useEffect(() => {
+    if (n < 2 || paused) return;
+    const t = setInterval(() => setActive((i) => (i + 1) % n), 4500);
+    return () => clearInterval(t);
+  }, [n, paused]);
+
+  if (n === 0) {
+    return <RoomScene slug={slug} scrim="none" />;
+  }
+
+  const go = (i: number) => {
+    setActive(((i % n) + n) % n);
+    setPaused(true);
+  };
+  const grad = roomVisual(slug).gradient;
+  const activeSrc = photos[active];
+
+  return (
+    <div className="absolute inset-0">
+      <div className={cn("absolute inset-0 bg-gradient-to-br", grad)} />
+      {/* ambient blurred wash of the centred photo */}
+      <AnimatePresence initial={false}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <motion.img
+          key={activeSrc}
+          src={activeSrc}
+          alt=""
+          aria-hidden
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.8 }}
+          className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl"
+        />
+      </AnimatePresence>
+      <div className="absolute inset-0 bg-black/45" />
+
+      {/* 3D stage */}
+      <motion.div
+        className="absolute inset-x-0 top-[5%] flex h-[62%] items-center justify-center"
+        style={{ perspective: 1400, transformStyle: "preserve-3d" }}
+        drag={n > 1 ? "x" : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.18}
+        onDragEnd={(_, info) => {
+          if (info.offset.x < -60) go(active + 1);
+          else if (info.offset.x > 60) go(active - 1);
+        }}
+      >
+        {photos.map((src, i) => {
+          const offset = i - active;
+          const abs = Math.abs(offset);
+          const hidden = abs > 2;
+          return (
+            <motion.button
+              key={src}
+              type="button"
+              onClick={() => offset !== 0 && go(i)}
+              aria-label={`Photo ${i + 1} of ${n}`}
+              className="absolute h-full w-[60%] max-w-[400px] overflow-hidden rounded-2xl ring-1 ring-white/15 shadow-[0_40px_90px_-30px_rgba(0,0,0,0.95)]"
+              animate={{
+                x: `${offset * 48}%`,
+                rotateY: offset * -38,
+                scale: offset === 0 ? 1 : 0.82,
+                z: -abs * 200,
+                opacity: hidden ? 0 : 1
+              }}
+              transition={{ type: "spring", stiffness: 220, damping: 28 }}
+              style={{
+                zIndex: 50 - abs,
+                transformStyle: "preserve-3d",
+                pointerEvents: hidden ? "none" : "auto"
+              }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt="" aria-hidden draggable={false} className="h-full w-full object-cover" />
+              {offset !== 0 && <div className="absolute inset-0 bg-black/45" />}
+            </motion.button>
+          );
+        })}
+      </motion.div>
+
+      {n > 1 && (
+        <div className="absolute left-1/2 top-4 z-20 flex -translate-x-1/2 gap-1.5">
+          {photos.map((src, i) => (
+            <button
+              key={src}
+              type="button"
+              onClick={() => go(i)}
+              aria-label={`Go to photo ${i + 1}`}
+              className={cn(
+                "h-1.5 rounded-full transition-all",
+                i === active ? "w-6 bg-gold-300" : "w-1.5 bg-white/35 hover:bg-white/60"
+              )}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

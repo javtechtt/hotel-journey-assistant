@@ -4,10 +4,10 @@ import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { roomVisual, type RoomSceneKey } from "@/lib/room-visuals";
 
-// When NEXT_PUBLIC_USE_ROOM_IMAGES=1, real photos at /public/rooms/<slug>.jpg
-// are layered over the artwork. If a photo is missing it falls back silently
-// to the built-in SVG scene.
-const USE_ROOM_IMAGES = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES === "1";
+// Real photos at /public/rooms/<slug>.webp are layered over the artwork. If a
+// photo is missing it falls back silently to the built-in SVG scene. Photos
+// are on by default; set NEXT_PUBLIC_USE_ROOM_IMAGES=0 to force art-only.
+const USE_ROOM_IMAGES = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES !== "0";
 // Tried in order; first one that loads wins, otherwise fall back to the SVG.
 const PHOTO_EXTS = ["webp", "jpg", "jpeg", "png"];
 
