@@ -59,3 +59,23 @@ export function roomVisual(slug?: string | null): RoomVisual {
   if (!slug) return FALLBACK;
   return MAP[slug] ?? FALLBACK;
 }
+
+// Whether real room photos are layered over the procedural art.
+export const ROOM_IMAGES_ENABLED = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES === "1";
+
+// How many photos exist per room type in /public/rooms. The first is
+// `<slug>.webp`; the rest are `<slug>2.webp`, `<slug>3.webp`, … .
+const PHOTO_COUNTS: Record<string, number> = {
+  "ocean-view-suite": 1,
+  "garden-king-room": 3,
+  "executive-business-suite": 2,
+  "family-villa": 4
+};
+
+// Ordered list of photo paths for a room's gallery. Empty when images are
+// disabled, so callers fall back to the SVG scene.
+export function roomPhotos(slug?: string | null): string[] {
+  if (!ROOM_IMAGES_ENABLED || !slug) return [];
+  const n = PHOTO_COUNTS[slug] ?? 1;
+  return Array.from({ length: n }, (_, i) => `/rooms/${slug}${i === 0 ? "" : i + 1}.webp`);
+}

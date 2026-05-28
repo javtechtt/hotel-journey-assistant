@@ -1,12 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { RoomCard } from "@/components/RoomCard";
 import { RoomScene } from "@/components/art/RoomScene";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
-import { roomVisual } from "@/lib/room-visuals";
+import { roomPhotos, roomVisual } from "@/lib/room-visuals";
 import type { RoomTypeWire } from "@/lib/wire-types";
 
 // Bento spans (4-room layout): one tall hero + one wide + two compact tiles.
@@ -121,6 +122,18 @@ function FocusedRoom({
   onClose: () => void;
 }) {
   const v = roomVisual(rt.slug);
+  const photos = roomPhotos(rt.slug);
+  const [idx, setIdx] = useState(0);
+  const [paused, setPaused] = useState(false);
+
+  // Gently cycle through the room's photos so a guest sees the whole gallery
+  // even hands-free; manual selection pins the chosen image.
+  useEffect(() => {
+    if (photos.length < 2 || paused) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % photos.length), 4000);
+    return () => clearInterval(t);
+  }, [photos.length, paused]);
+
   return (
     <motion.div
       initial={{ scale: 0.9, opacity: 0, y: 22 }}
@@ -131,11 +144,46 @@ function FocusedRoom({
       className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] ring-1 ring-gold-400/40 shadow-[0_60px_140px_-40px_rgba(0,0,0,0.85)]"
     >
       <div className="relative h-[58vh] max-h-[560px]">
-        <RoomScene slug={rt.slug} scrim="full" />
+        <AnimatePresence initial={false}>
+          <motion.div
+            key={photos[idx] ?? "scene"}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.7 }}
+            className="absolute inset-0"
+          >
+            <RoomScene slug={rt.slug} image={photos[idx]} scrim="full" />
+          </motion.div>
+        </AnimatePresence>
+
+        {photos.length > 1 && (
+          <div className="absolute left-4 top-4 z-10 flex gap-2">
+            {photos.map((src, i) => (
+              <button
+                key={src}
+                onClick={() => {
+                  setIdx(i);
+                  setPaused(true);
+                }}
+                className={cn(
+                  "h-11 w-16 overflow-hidden rounded-lg border transition",
+                  i === idx
+                    ? "border-gold-300 ring-1 ring-gold-300/60"
+                    : "border-white/20 opacity-60 hover:opacity-100"
+                )}
+                aria-label={`View photo ${i + 1}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={src} alt="" aria-hidden className="h-full w-full object-cover" />
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/35 text-white/70 transition hover:text-white"
+          className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-full border border-white/10 bg-black/35 text-white/70 transition hover:text-white"
           aria-label="Back to all rooms"
         >
           <Icon name="close" className="h-4 w-4" />
