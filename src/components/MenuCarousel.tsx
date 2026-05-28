@@ -14,7 +14,7 @@ export function MenuCarousel({ menu }: { menu: MenuItemWire[] }) {
   const radius = Math.max(220, Math.round(CARD_W / 2 / Math.tan(Math.PI / n)) + 28);
 
   return (
-    <div className="carousel relative grid h-full min-h-0 place-items-center [perspective:1200px] [perspective-origin:50%_45%]">
+    <div className="carousel relative grid h-full min-h-[340px] place-items-center overflow-hidden [perspective:1200px] [perspective-origin:50%_45%]">
       <div
         className="carousel-ring relative"
         style={{ width: CARD_W, height: 196, transformStyle: "preserve-3d" }}
