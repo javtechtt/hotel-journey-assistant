@@ -93,6 +93,14 @@ export default function CustomerPage() {
     stateRef.current = { stage, reservation, focusedSlug };
   }, [stage, reservation, focusedSlug]);
 
+  // Clear any spoken-room highlight when the stage changes, so nothing appears
+  // pre-selected on arrival (e.g. a room named during the welcome greeting must
+  // not carry a highlight into the discovery gallery).
+  useEffect(() => {
+    setSpokenSlug(null);
+    if (highlightTimerRef.current) clearTimeout(highlightTimerRef.current);
+  }, [stage]);
+
   // ---- Initial room catalog (visual richness before voice connects) ----
   useEffect(() => {
     fetch("/api/rooms")
