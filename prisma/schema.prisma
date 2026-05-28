@@ -1,0 +1,154 @@
+// Prisma schema for hotel-journey-assistant
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Hotel {
+  id          String   @id @default(cuid())
+  name        String
+  tagline     String
+  city        String
+  country     String
+  description String
+  createdAt   DateTime @default(now())
+}
+
+model RoomType {
+  id            String   @id @default(cuid())
+  slug          String   @unique
+  name          String
+  shortPitch    String
+  description   String
+  mood          String
+  amenities     String   // JSON-encoded string[]
+  capacity      Int
+  bedConfig     String
+  sizeSqft      Int
+  view          String
+  nightlyRate   Int      // in cents
+  heroColor     String   // tailwind gradient class hint
+  imageEmoji    String   // emoji used as visual placeholder
+  createdAt     DateTime @default(now())
+  rooms         Room[]
+  reservations  Reservation[]
+}
+
+model Room {
+  id          String   @id @default(cuid())
+  number      String   @unique
+  floor       Int
+  roomTypeId  String
+  roomType    RoomType @relation(fields: [roomTypeId], references: [id])
+  reservations Reservation[]
+}
+
+model Reservation {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  guestName       String
+  partySize       Int
+  checkInDate     DateTime
+  checkOutDate    DateTime
+  nights          Int
+  roomTypeId      String
+  roomType        RoomType @relation(fields: [roomTypeId], references: [id])
+  roomId          String?
+  status          String   // HOLD | CONFIRMED | CANCELLED | CHECKED_OUT
+  subtotalCents   Int
+  taxesCents      Int
+  totalCents      Int
+  cardLast4       String?  // last 4 digits only
+  cardBrand       String?
+  createdAt       DateTime @default(now())
+  confirmedAt     DateTime?
+  room            Room?    @relation(fields: [roomId], references: [id])
+  orders          RoomServiceOrder[]
+  messages        LobbyMessage[]
+  events          JourneyEvent[]
+  payment         Payment?
+}
+
+model Payment {
+  id              String   @id @default(cuid())
+  reservationId   String   @unique
+  reservation     Reservation @relation(fields: [reservationId], references: [id])
+  amountCents     Int
+  cardLast4       String
+  cardBrand       String
+  status          String   // APPROVED
+  authCode        String
+  createdAt       DateTime @default(now())
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String
+  category    String   // BREAKFAST | DRINK | DINNER | HOUSEKEEPING | CONCIERGE | SPA
+  priceCents  Int
+  emoji       String
+  available   Boolean  @default(true)
+  orderItems  RoomServiceOrderItem[]
+}
+
+model RoomServiceOrder {
+  id             String   @id @default(cuid())
+  reservationId  String
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  roomNumber     String
+  status         String   // RECEIVED | PREPARING | EN_ROUTE | DELIVERED | CANCELLED
+  totalCents     Int
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  items          RoomServiceOrderItem[]
+}
+
+model RoomServiceOrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       RoomServiceOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  menuItemId  String
+  menuItem    MenuItem @relation(fields: [menuItemId], references: [id])
+  name        String
+  quantity    Int
+  priceCents  Int
+}
+
+model LobbyMessage {
+  id             String   @id @default(cuid())
+  reservationId  String
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  roomNumber     String
+  fromGuest      Boolean
+  body           String
+  status         String   // OPEN | RESOLVED
+  createdAt      DateTime @default(now())
+  replies        LobbyReply[]
+}
+
+model LobbyReply {
+  id          String   @id @default(cuid())
+  messageId   String
+  message     LobbyMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  body        String
+  fromStaff   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+model JourneyEvent {
+  id             String   @id @default(cuid())
+  reservationId  String?
+  reservation    Reservation? @relation(fields: [reservationId], references: [id])
+  sessionId      String?
+  kind           String   // VIEWED_ROOMS, CHECKED_AVAILABILITY, RESERVATION_HOLD, CHECKOUT_COMPLETED, RESERVATION_CONFIRMED, ORDER_PLACED, ORDER_STATUS_CHANGED, LOBBY_MESSAGE_SENT, LOBBY_REPLY_SENT, ROOM_VIEWED
+  label          String
+  metadata       String?  // JSON
+  createdAt      DateTime @default(now())
+}
