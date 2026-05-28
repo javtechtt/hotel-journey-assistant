@@ -351,6 +351,11 @@ export default function CustomerPage() {
               }, 1500);
             }
             break;
+          case "get_menu_items":
+            if (Array.isArray(d?.items)) setMenu(d.items as MenuItemWire[]);
+            // Showing the menu means opening the concierge area (post-booking).
+            if (stateRef.current.reservation?.status === "CONFIRMED") setStage("concierge");
+            break;
           case "place_room_service_order":
             if (d) setStage("concierge");
             break;
