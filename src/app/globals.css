@@ -34,15 +34,15 @@ body {
 /* ---------- Surfaces ---------- */
 .glass {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
-  backdrop-filter: blur(22px) saturate(150%);
-  -webkit-backdrop-filter: blur(22px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.07);
   box-shadow: 0 40px 90px -40px rgba(0, 0, 0, 0.75);
 }
 .glass-strong {
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.025));
-  backdrop-filter: blur(34px) saturate(165%);
-  -webkit-backdrop-filter: blur(34px) saturate(165%);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: 0 50px 120px -50px rgba(0, 0, 0, 0.85);
 }
@@ -84,31 +84,33 @@ body {
 .aurora::after {
   content: "";
   position: absolute;
-  width: 80vmax;
-  height: 80vmax;
+  width: 60vmax;
+  height: 60vmax;
   border-radius: 50%;
-  filter: blur(80px);
-  opacity: 0.55;
-  mix-blend-mode: screen;
-  animation: drift 26s ease-in-out infinite alternate;
+  /* Smaller radius + no screen blend + translate-only motion keeps the
+     compositor from re-rasterizing this huge layer every frame. */
+  filter: blur(46px);
+  opacity: 0.5;
+  will-change: transform;
+  animation: drift 30s ease-in-out infinite alternate;
 }
 .aurora::before {
-  top: -30vmax;
-  left: -20vmax;
+  top: -22vmax;
+  left: -15vmax;
   background: radial-gradient(circle at center, var(--aurora-a, rgba(212, 167, 59, 0.45)), transparent 60%);
 }
 .aurora::after {
-  bottom: -30vmax;
-  right: -20vmax;
+  bottom: -22vmax;
+  right: -15vmax;
   background: radial-gradient(circle at center, var(--aurora-b, rgba(51, 178, 164, 0.4)), transparent 60%);
-  animation-duration: 32s;
+  animation-duration: 36s;
   animation-direction: alternate-reverse;
 }
 
 @keyframes drift {
-  0% { transform: translate3d(0, 0, 0) scale(1); }
-  50% { transform: translate3d(6vmax, 4vmax, 0) scale(1.12); }
-  100% { transform: translate3d(-4vmax, -3vmax, 0) scale(1.05); }
+  0% { transform: translate3d(0, 0, 0); }
+  50% { transform: translate3d(5vmax, 3vmax, 0); }
+  100% { transform: translate3d(-4vmax, -2vmax, 0); }
 }
 
 .vignette {
@@ -123,8 +125,7 @@ body {
 
 .grain {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
-  opacity: 0.05;
-  mix-blend-mode: overlay;
+  opacity: 0.045;
 }
 
 /* ---------- Motion ---------- */

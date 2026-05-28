@@ -75,6 +75,9 @@ export default function CustomerPage() {
     check_out_date?: string;
     party_size?: number;
   }>({});
+  // The live calendar is shown the moment the agent starts asking for dates —
+  // before any value is collected — so it does not wait for the guest's answer.
+  const [calendarOpen, setCalendarOpen] = useState(false);
   // Live snapshot of the journey so the agent can resume via get_session_state
   // after the guest pauses/resumes the voice session — state is never reset by
   // stopping the audio, and is read from this store rather than guessed.
@@ -245,6 +248,14 @@ export default function CustomerPage() {
       return { ok: false, error: "That section isn't available from here yet." };
     }
 
+    // begin_date_selection just opens the empty calendar the instant the agent
+    // starts asking for dates — no value needed yet.
+    if (call.name === "begin_date_selection") {
+      setCalendarOpen(true);
+      setAmenitiesOpen(false);
+      return { ok: true, data: { acknowledged: true } };
+    }
+
     // set_stay_details is answered locally — it just fills the live calendar as
     // the agent collects dates (merges partial values).
     if (call.name === "set_stay_details") {
@@ -254,6 +265,7 @@ export default function CustomerPage() {
         check_out_date: (a.check_out_date as string) ?? prev.check_out_date,
         party_size: (a.party_size as number) ?? prev.party_size
       }));
+      setCalendarOpen(true);
       setAmenitiesOpen(false);
       return { ok: true, data: { acknowledged: true } };
     }
@@ -312,6 +324,7 @@ export default function CustomerPage() {
             if (d) {
               setAvailability(d as AvailabilityWire);
               setStayDraft({}); // the availability stage shows the dates now
+              setCalendarOpen(false);
               setStage("availability");
             }
             break;
@@ -364,6 +377,7 @@ export default function CustomerPage() {
               setAmenitiesOpen(false);
               setPaymentDraft({});
               setStayDraft({});
+              setCalendarOpen(false);
               setStage("discovery");
             }
             break;
@@ -423,6 +437,12 @@ export default function CustomerPage() {
   // The details lightbox only belongs on the room stage.
   useEffect(() => {
     if (stage !== "roomDetail") setAmenitiesOpen(false);
+  }, [stage]);
+
+  // The live calendar belongs to the date-collection phase (room browsing /
+  // focus); drop it once the journey moves on (availability, checkout, etc.).
+  useEffect(() => {
+    if (stage !== "roomDetail" && stage !== "discovery") setCalendarOpen(false);
   }, [stage]);
 
   const availabilityLabelForFocused = useMemo(() => {
@@ -571,15 +591,17 @@ export default function CustomerPage() {
       </AnimatePresence>
 
       <AnimatePresence>
-        {stage === "roomDetail" &&
-          (stayDraft.check_in_date || stayDraft.check_out_date || stayDraft.party_size) && (
-            <StayCalendar
-              checkIn={stayDraft.check_in_date}
-              checkOut={stayDraft.check_out_date}
-              partySize={stayDraft.party_size}
-              onClose={() => setStayDraft({})}
-            />
-          )}
+        {calendarOpen && (stage === "roomDetail" || stage === "discovery") && (
+          <StayCalendar
+            checkIn={stayDraft.check_in_date}
+            checkOut={stayDraft.check_out_date}
+            partySize={stayDraft.party_size}
+            onClose={() => {
+              setStayDraft({});
+              setCalendarOpen(false);
+            }}
+          />
+        )}
       </AnimatePresence>
 
       <VoiceDock

@@ -91,6 +91,13 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
+    name: "begin_date_selection",
+    description:
+      "What: brings the live date calendar onto the guest's screen, empty and ready to fill. When: the INSTANT you begin asking for the check-in date — call it before you finish the question and do NOT wait for the guest to answer. Note: afterwards use set_stay_details to fill in each date and the guest count as they're given.",
+    parameters: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    type: "function",
     name: "set_stay_details",
     description:
       "What: shows and updates an on-screen calendar with the stay dates as you collect them. When: while gathering check-in, check-out, and guest count in the room phase — call it after each piece so the calendar fills in live. Note: pass only what you have so far (it merges); dates as YYYY-MM-DD.",

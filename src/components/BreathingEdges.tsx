@@ -73,12 +73,12 @@ export function BreathingEdges({
     <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
       <div
         ref={leftRef}
-        className="absolute left-0 top-0 h-full w-[38vw] origin-left blur-[100px] transition-[background] duration-700 will-change-[opacity,transform]"
+        className="absolute left-0 top-0 h-full w-[38vw] origin-left blur-[56px] transition-[background] duration-700 will-change-[opacity,transform]"
         style={{ background: glow, opacity: 0.12 }}
       />
       <div
         ref={rightRef}
-        className="absolute right-0 top-0 h-full w-[38vw] origin-right blur-[100px] transition-[background] duration-700 will-change-[opacity,transform]"
+        className="absolute right-0 top-0 h-full w-[38vw] origin-right blur-[56px] transition-[background] duration-700 will-change-[opacity,transform]"
         style={{ background: glow, opacity: 0.12 }}
       />
     </div>
