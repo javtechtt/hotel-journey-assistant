@@ -39,7 +39,7 @@ export async function createRealtimeClientSecret(opts: {
               // speech cancel the in-progress reply.
               turn_detection: {
                 type: "server_vad",
-                threshold: 0.55,
+                threshold: 0.8,
                 prefix_padding_ms: 300,
                 silence_duration_ms: 550,
                 create_response: true,
