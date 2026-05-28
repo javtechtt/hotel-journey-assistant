@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { RealtimeClient } from "@/lib/realtime-client";
+import { AudioMeter } from "@/lib/audio-meter";
 
 export type VoiceStatus =
   | "idle"
@@ -44,6 +45,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   const [audioStream, setAudioStream] = useState<MediaStream | null>(null);
   const [muted, setMuted] = useState(false);
   const clientRef = useRef<RealtimeClient | null>(null);
+  // Live 0..1 loudness (mic + agent), read each frame by the breathing edges.
+  const levelRef = useRef(0);
+  const meterRef = useRef<AudioMeter | null>(null);
   // Buffers for streaming assistant output and pending function args
   const assistantBufRef = useRef<Map<string, string>>(new Map());
   const guestBufRef = useRef<Map<string, string>>(new Map());
@@ -208,6 +212,10 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     responseActiveRef.current = false;
     followupQueuedRef.current = false;
     processedCallsRef.current.clear();
+    meterRef.current?.stop();
+    meterRef.current = new AudioMeter((l) => {
+      levelRef.current = l;
+    });
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (opts.agent === "admin" && opts.adminPin) {
@@ -238,7 +246,10 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
         ephemeralKey,
         model,
         onEvent: handleEvent,
-        onRemoteAudioTrack: (s) => setAudioStream(s),
+        onRemoteAudioTrack: (s) => {
+          setAudioStream(s);
+          meterRef.current?.add(s); // agent voice feeds the breathing edges
+        },
         // Fire the proactive greeting the moment the data channel is open so
         // the assistant speaks first instead of waiting for the guest.
         onOpen: () => greet(),
@@ -250,6 +261,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
       });
       clientRef.current = client;
       await client.connect();
+      // Feed the guest's mic into the meter and begin measuring loudness.
+      if (client.localStream) meterRef.current?.add(client.localStream);
+      meterRef.current?.start();
       setStatus("listening");
       // Fallback in case the open event was missed before the handler attached.
       setTimeout(greet, 600);
@@ -262,6 +276,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   const stop = useCallback(() => {
     clientRef.current?.close();
     clientRef.current = null;
+    meterRef.current?.stop();
+    meterRef.current = null;
+    levelRef.current = 0;
     setStatus("idle");
     setAudioStream(null);
   }, []);
@@ -278,6 +295,8 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     return () => {
       clientRef.current?.close();
       clientRef.current = null;
+      meterRef.current?.stop();
+      meterRef.current = null;
     };
   }, []);
 
@@ -287,6 +306,7 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     transcript,
     audioStream,
     muted,
+    levelRef,
     start,
     stop,
     toggleMute

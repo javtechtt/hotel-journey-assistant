@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StageAtmosphere } from "@/components/StageAtmosphere";
+import { BreathingEdges } from "@/components/BreathingEdges";
 import { VoiceDock } from "@/components/VoiceDock";
 import { TranscriptRail } from "@/components/TranscriptRail";
 import { AudioSink } from "@/components/AudioSink";
@@ -188,6 +189,7 @@ export default function AdminPage() {
   return (
     <main className="relative min-h-screen pb-44">
       <StageAtmosphere aurora={["rgba(212,167,59,0.32)", "rgba(99,102,241,0.28)"]} />
+      <BreathingEdges levelRef={voice.levelRef} status={voice.status} />
       <AudioSink stream={voice.audioStream} />
 
       <div className="relative z-10 mx-auto max-w-[1480px] px-6 pt-8 lg:px-10">

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { StageAtmosphere } from "@/components/StageAtmosphere";
+import { BreathingEdges } from "@/components/BreathingEdges";
 import { JourneyProgress, type JourneyStepKey } from "@/components/JourneyProgress";
 import { VoiceDock } from "@/components/VoiceDock";
 import { AudioSink } from "@/components/AudioSink";
@@ -461,6 +462,7 @@ export default function CustomerPage() {
   return (
     <main className="relative flex h-[100dvh] flex-col overflow-hidden">
       <StageAtmosphere aurora={aurora} />
+      <BreathingEdges levelRef={voice.levelRef} status={voice.status} />
       <AudioSink stream={voice.audioStream} />
 
       {/* top bar */}
