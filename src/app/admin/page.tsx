@@ -111,6 +111,22 @@ export default function AdminPage() {
     });
     fetchDashboard();
   };
+  const deleteReservation = async (code: string) => {
+    if (!authedPin) return;
+    if (
+      !window.confirm(
+        `Delete reservation ${code}? This permanently removes its orders, messages, and journey history. This cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    await fetch(`/api/reservations?code=${encodeURIComponent(code)}`, {
+      method: "DELETE",
+      headers: { "x-admin-pin": authedPin }
+    });
+    if (focusCode === code) setFocusCode(null);
+    fetchDashboard();
+  };
   const replyToMessage = async (messageId: string, body: string) => {
     if (!authedPin || !body.trim()) return;
     await fetch("/api/messages", {
@@ -232,6 +248,7 @@ export default function AdminPage() {
                       <th className="px-3 py-2 text-left font-normal">Stay</th>
                       <th className="px-3 py-2 text-left font-normal">Status</th>
                       <th className="px-3 py-2 text-right font-normal">Total</th>
+                      <th className="px-3 py-2 text-right font-normal"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -254,11 +271,22 @@ export default function AdminPage() {
                         </td>
                         <td className="px-3 py-3"><StatusPill status={r.status} /></td>
                         <td className="px-3 py-3 text-right text-sand-100">{formatMoney(r.total_cents)}</td>
+                        <td className="px-3 py-3 text-right">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteReservation(r.code);
+                            }}
+                            className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-rose-300/70 transition hover:border-rose-400/40 hover:text-rose-300"
+                          >
+                            delete
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {(dash?.reservations.length ?? 0) === 0 && (
                       <tr>
-                        <td colSpan={6} className="py-6 text-center text-sm italic text-white/40">
+                        <td colSpan={7} className="py-6 text-center text-sm italic text-white/40">
                           No reservations yet.
                         </td>
                       </tr>

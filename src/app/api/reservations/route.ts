@@ -1,8 +1,35 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Hard-delete a reservation and everything that hangs off it. The schema has no
+// DB-level cascade from these children to Reservation, so remove them in a
+// single transaction first. (Order items and lobby replies do cascade from
+// their own parents.)
+export async function DELETE(req: Request) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Admin PIN required" }, { status: 401 });
+  }
+  const code = new URL(req.url).searchParams.get("code");
+  if (!code) return NextResponse.json({ error: "code required" }, { status: 400 });
+
+  const reservation = await prisma.reservation.findUnique({ where: { code } });
+  if (!reservation) return NextResponse.json({ error: "not found" }, { status: 404 });
+  const reservationId = reservation.id;
+
+  await prisma.$transaction([
+    prisma.roomServiceOrder.deleteMany({ where: { reservationId } }),
+    prisma.lobbyMessage.deleteMany({ where: { reservationId } }),
+    prisma.journeyEvent.deleteMany({ where: { reservationId } }),
+    prisma.payment.deleteMany({ where: { reservationId } }),
+    prisma.reservation.delete({ where: { id: reservationId } })
+  ]);
+
+  return NextResponse.json({ ok: true, code });
+}
 
 export async function GET(req: Request) {
   const url = new URL(req.url);

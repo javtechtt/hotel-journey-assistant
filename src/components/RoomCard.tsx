@@ -63,17 +63,19 @@ export function RoomCard({
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-0 p-5">
-        <div className={cn("mb-1.5 text-[10px] uppercase tracking-[0.3em]", v.accent)}>
+      <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
+        <div className={cn("mb-1 text-[10px] uppercase tracking-[0.3em] sm:mb-1.5", v.accent)}>
           {rt.mood.split("·")[0]?.trim()}
         </div>
-        <h3 className="font-display text-[1.7rem] leading-none text-sand-100 drop-shadow">{rt.name}</h3>
-        <div className="mt-3 flex items-end justify-between">
+        <h3 className="font-display text-[1.2rem] leading-[1.12] text-sand-100 drop-shadow sm:text-[1.7rem] sm:leading-[1.05]">
+          {rt.name}
+        </h3>
+        <div className="mt-2 flex items-end justify-between sm:mt-3">
           <span className="inline-flex items-center gap-1.5 text-xs text-white/70">
             <Icon name="users" className="h-4 w-4" /> {rt.capacity}
           </span>
           <div className="text-right">
-            <div className="text-gold text-2xl font-semibold leading-none">
+            <div className="text-gold text-xl font-semibold leading-none sm:text-2xl">
               {formatMoney(rt.nightlyRateCents)}
             </div>
             <div className="text-[9px] uppercase tracking-[0.2em] text-white/45">night</div>
