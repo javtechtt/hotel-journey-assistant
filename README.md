@@ -9,7 +9,7 @@ The guest never has to type or click through the booking flow — they speak wit
 ```bash
 npm install
 cp .env.example .env.local        # (Windows: copy .env.example .env.local)
-# Edit .env.local: set OPENAI_API_KEY=sk-... and your Postgres DATABASE_URL + DIRECT_URL
+# Edit .env.local: set OPENAI_API_KEY=sk-... and your Postgres DATABASE_URL + DATABASE_URL_UNPOOLED
 
 npx prisma generate
 npx prisma db push        # creates the tables in your Postgres database
@@ -19,7 +19,7 @@ npm run dev
 
 > **Database:** the app uses **PostgreSQL** (Neon, Vercel Postgres, or Supabase all work).
 > Create a database, then put its **pooled** URL in `DATABASE_URL` and its **direct** URL in
-> `DIRECT_URL`. `prisma db push` syncs the schema; `npm run seed` populates it.
+> `DATABASE_URL_UNPOOLED`. `prisma db push` syncs the schema; `npm run seed` populates it.
 
 Then open:
 
@@ -33,8 +33,8 @@ You will need to grant **microphone permission** in your browser the first time 
 | Variable              | Purpose                                                         |
 | --------------------- | --------------------------------------------------------------- |
 | `OPENAI_API_KEY`      | Server-side only. Used to mint ephemeral Realtime session keys. |
-| `DATABASE_URL`        | Postgres **pooled** connection string (used at runtime).        |
-| `DIRECT_URL`          | Postgres **direct** connection string (used by `prisma db push`).|
+| `DATABASE_URL`          | Postgres **pooled** connection string (used at runtime).        |
+| `DATABASE_URL_UNPOOLED` | Postgres **direct** connection string (used by `prisma db push`). Neon's native name. |
 | `NEXT_PUBLIC_APP_URL` | Optional. Public base URL for the app.                          |
 | `ADMIN_PIN`           | PIN that gates `/admin` and admin tools (default `2468`).       |
 | `NEXT_PUBLIC_USE_ROOM_IMAGES` | Set to `1` to use photos in `public/rooms/` over the SVG art. |
@@ -118,7 +118,7 @@ The wording on screen and from the assistant is always realistic ("Secure checko
 2. Create a Postgres database (Neon, Vercel Postgres, or Supabase).
 3. In **Project → Settings → Environment Variables**, add:
    - `OPENAI_API_KEY`
-   - `DATABASE_URL` (pooled) and `DIRECT_URL` (direct)
+   - `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct)
    - `ADMIN_PIN`
    - `NEXT_PUBLIC_USE_ROOM_IMAGES=1`
    - `NEXT_PUBLIC_APP_URL` = your `https://…vercel.app` URL

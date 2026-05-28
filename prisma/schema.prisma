@@ -8,7 +8,8 @@ datasource db {
   // Pooled connection (pgbouncer) for the serverless runtime.
   url       = env("DATABASE_URL")
   // Direct connection used by `prisma db push` / migrations.
-  directUrl = env("DIRECT_URL")
+  // Uses Neon's native variable name so the Neon/Vercel integration works as-is.
+  directUrl = env("DATABASE_URL_UNPOOLED")
 }
 
 model Hotel {
