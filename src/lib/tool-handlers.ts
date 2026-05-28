@@ -467,25 +467,6 @@ export async function confirm_checkout(
   });
 }
 
-export async function get_active_reservation(args: { reservation_code: string }) {
-  const r = await prisma.reservation.findUnique({
-    where: { code: args.reservation_code },
-    include: { room: true, roomType: true }
-  });
-  if (!r) return fail("Reservation not found.");
-  return ok({
-    reservation_code: r.code,
-    status: r.status,
-    guest_name: r.guestName,
-    room_type: r.roomType.name,
-    room_number: r.room?.number ?? null,
-    check_in_date: r.checkInDate.toISOString().slice(0, 10),
-    check_out_date: r.checkOutDate.toISOString().slice(0, 10),
-    nights: r.nights,
-    total_usd: r.totalCents / 100
-  });
-}
-
 export async function resume_reservation(args: {
   reservation_code?: string;
   room_number?: string;
@@ -897,7 +878,6 @@ export const CUSTOMER_HANDLERS = {
   modify_reservation_hold,
   cancel_reservation,
   confirm_checkout,
-  get_active_reservation,
   get_menu_items,
   place_room_service_order,
   send_lobby_message,

@@ -173,20 +173,6 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
-    name: "get_active_reservation",
-    description:
-      "Look up a confirmed reservation by code. Returns the assigned room number, dates, and status.",
-    parameters: {
-      type: "object",
-      properties: {
-        reservation_code: { type: "string" }
-      },
-      required: ["reservation_code"],
-      additionalProperties: false
-    }
-  },
-  {
-    type: "function",
     name: "resume_reservation",
     description:
       "Look up the guest's CONFIRMED reservation and open their concierge area (room service & lobby messaging) from any screen. Prefer the name on the booking. If more than one booking shares that name, the tool will ask you to disambiguate — then call again with the room_number or reservation_code.",
