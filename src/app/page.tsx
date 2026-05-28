@@ -14,6 +14,7 @@ import { CheckoutStage, type PaymentPrefill } from "@/components/stages/Checkout
 import { ConfirmationStage } from "@/components/stages/ConfirmationStage";
 import { ConciergeStage } from "@/components/stages/ConciergeStage";
 import { RoomAmenitiesLightbox } from "@/components/RoomAmenitiesLightbox";
+import { StayCalendar } from "@/components/StayCalendar";
 import { useRealtimeVoice, type ToolCallEvent } from "@/lib/use-realtime-voice";
 import { roomVisual } from "@/lib/room-visuals";
 import { POLL_INTERVAL_MS } from "@/lib/config";
@@ -68,6 +69,12 @@ export default function CustomerPage() {
   const [amenitiesOpen, setAmenitiesOpen] = useState(false);
   // Voice-collected payment details (display-only; never stored server-side).
   const [paymentDraft, setPaymentDraft] = useState<PaymentPrefill>({});
+  // Stay dates being collected (drives the live calendar during the room phase).
+  const [stayDraft, setStayDraft] = useState<{
+    check_in_date?: string;
+    check_out_date?: string;
+    party_size?: number;
+  }>({});
   // Live snapshot of the journey so the agent can resume via get_session_state
   // after the guest pauses/resumes the voice session — state is never reset by
   // stopping the audio, and is read from this store rather than guessed.
@@ -238,6 +245,19 @@ export default function CustomerPage() {
       return { ok: false, error: "That section isn't available from here yet." };
     }
 
+    // set_stay_details is answered locally — it just fills the live calendar as
+    // the agent collects dates (merges partial values).
+    if (call.name === "set_stay_details") {
+      const a = call.arguments;
+      setStayDraft((prev) => ({
+        check_in_date: (a.check_in_date as string) ?? prev.check_in_date,
+        check_out_date: (a.check_out_date as string) ?? prev.check_out_date,
+        party_size: (a.party_size as number) ?? prev.party_size
+      }));
+      setAmenitiesOpen(false);
+      return { ok: true, data: { acknowledged: true } };
+    }
+
     const res = await fetch("/api/agent-tool", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -291,6 +311,7 @@ export default function CustomerPage() {
           case "check_availability":
             if (d) {
               setAvailability(d as AvailabilityWire);
+              setStayDraft({}); // the availability stage shows the dates now
               setStage("availability");
             }
             break;
@@ -342,6 +363,7 @@ export default function CustomerPage() {
               setAvailability(null);
               setAmenitiesOpen(false);
               setPaymentDraft({});
+              setStayDraft({});
               setStage("discovery");
             }
             break;
@@ -546,6 +568,18 @@ export default function CustomerPage() {
         {amenitiesOpen && focusedRoom && (
           <RoomAmenitiesLightbox rt={focusedRoom} onClose={() => setAmenitiesOpen(false)} />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {stage === "roomDetail" &&
+          (stayDraft.check_in_date || stayDraft.check_out_date || stayDraft.party_size) && (
+            <StayCalendar
+              checkIn={stayDraft.check_in_date}
+              checkOut={stayDraft.check_out_date}
+              partySize={stayDraft.party_size}
+              onClose={() => setStayDraft({})}
+            />
+          )}
       </AnimatePresence>
 
       <VoiceDock

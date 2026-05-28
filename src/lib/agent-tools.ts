@@ -91,6 +91,21 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
+    name: "set_stay_details",
+    description:
+      "What: shows and updates an on-screen calendar with the stay dates as you collect them. When: while gathering check-in, check-out, and guest count in the room phase — call it after each piece so the calendar fills in live. Note: pass only what you have so far (it merges); dates as YYYY-MM-DD.",
+    parameters: {
+      type: "object",
+      properties: {
+        check_in_date: { type: "string", description: "ISO date YYYY-MM-DD." },
+        check_out_date: { type: "string", description: "ISO date YYYY-MM-DD." },
+        party_size: { type: "integer", minimum: 1, maximum: 8 }
+      },
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
     name: "check_availability",
     description:
       "What: checks which room types are open between the given check-in and check-out dates for the party size. When: you have the dates and guest count. Note: pass dates as YYYY-MM-DD.",
