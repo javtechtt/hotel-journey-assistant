@@ -13,6 +13,7 @@ import { useRealtimeVoice, type ToolCallEvent } from "@/lib/use-realtime-voice";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/cn";
 import type { JourneyEventWire } from "@/lib/wire-types";
+import { POLL_INTERVAL_MS } from "@/lib/config";
 
 type Dashboard = {
   totals: {
@@ -88,7 +89,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (!authedPin) return;
     fetchDashboard();
-    const t = setInterval(fetchDashboard, 4000);
+    const t = setInterval(fetchDashboard, POLL_INTERVAL_MS);
     return () => clearInterval(t);
   }, [authedPin, fetchDashboard]);
 

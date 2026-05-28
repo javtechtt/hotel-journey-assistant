@@ -16,6 +16,7 @@ import { ConciergeStage } from "@/components/stages/ConciergeStage";
 import { RoomAmenitiesLightbox } from "@/components/RoomAmenitiesLightbox";
 import { useRealtimeVoice, type ToolCallEvent } from "@/lib/use-realtime-voice";
 import { roomVisual } from "@/lib/room-visuals";
+import { POLL_INTERVAL_MS } from "@/lib/config";
 import {
   normalizeRoom,
   type AvailabilityWire,
@@ -182,7 +183,7 @@ export default function CustomerPage() {
           );
         }
       } catch {}
-      t = setTimeout(tick, 4000);
+      t = setTimeout(tick, POLL_INTERVAL_MS);
     };
     tick();
     return () => clearTimeout(t);
