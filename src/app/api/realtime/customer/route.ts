@@ -25,7 +25,8 @@ export async function POST() {
     model: REALTIME_MODEL,
     instructions: CUSTOMER_AGENT_INSTRUCTIONS,
     tools: CUSTOMER_TOOLS,
-    voice: "marin"
+    voice: process.env.OPENAI_REALTIME_VOICE || "sage",
+    speed: Number(process.env.OPENAI_REALTIME_SPEED) || 1.1
   });
 
   if (!result.ok) {

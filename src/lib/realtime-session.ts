@@ -13,6 +13,7 @@ export async function createRealtimeClientSecret(opts: {
   instructions: string;
   tools: unknown[];
   voice: string;
+  speed?: number;
 }): Promise<Result> {
   let res: Response;
   try {
@@ -34,7 +35,7 @@ export async function createRealtimeClientSecret(opts: {
               transcription: { model: "whisper-1" },
               turn_detection: { type: "server_vad", create_response: true }
             },
-            output: { voice: opts.voice }
+            output: { voice: opts.voice, speed: opts.speed ?? 1.0 }
           }
         }
       })

@@ -93,6 +93,25 @@ export async function get_room_details(args: { room_type_slug: string }, ctx: { 
   return ok({ room_type: roomTypeToWire(rt) });
 }
 
+export async function show_room_amenities(
+  args: { room_type_slug: string },
+  ctx: { sessionId?: string }
+) {
+  const rt = await prisma.roomType.findUnique({ where: { slug: args.room_type_slug } });
+  if (!rt) return fail("Room type not found.");
+  await logEvent({
+    sessionId: ctx.sessionId,
+    kind: "ROOM_VIEWED",
+    label: `Viewed full details for ${rt.name}`,
+    metadata: { slug: rt.slug }
+  });
+  return ok({ room_type: roomTypeToWire(rt) });
+}
+
+export async function close_room_details() {
+  return ok({ closed: true });
+}
+
 export async function check_availability(
   args: { check_in_date: string; check_out_date: string; party_size: number },
   ctx: { sessionId?: string }
@@ -231,6 +250,135 @@ export async function create_reservation_hold(
   });
 }
 
+export async function modify_reservation_hold(
+  args: {
+    reservation_code: string;
+    guest_name?: string;
+    room_type_slug?: string;
+    check_in_date?: string;
+    check_out_date?: string;
+    party_size?: number;
+  },
+  ctx: { sessionId?: string }
+) {
+  const reservation = await prisma.reservation.findUnique({
+    where: { code: args.reservation_code.trim().toUpperCase() },
+    include: { roomType: true }
+  });
+  if (!reservation) return fail("Reservation not found.");
+  if (reservation.status !== "HOLD") {
+    return fail("That booking is already confirmed, so it can't be changed here. I can cancel it if you'd like.");
+  }
+
+  const targetSlug = args.room_type_slug ?? reservation.roomType.slug;
+  const rt = await prisma.roomType.findUnique({
+    where: { slug: targetSlug },
+    include: { rooms: { include: { reservations: true } } }
+  });
+  if (!rt) return fail("Room type not found.");
+
+  const checkIn = args.check_in_date ? new Date(args.check_in_date) : reservation.checkInDate;
+  const checkOut = args.check_out_date ? new Date(args.check_out_date) : reservation.checkOutDate;
+  if (Number.isNaN(checkIn.getTime()) || Number.isNaN(checkOut.getTime()))
+    return fail("Invalid dates.");
+  if (checkOut <= checkIn) return fail("Check-out must be after check-in.");
+  const partySize = args.party_size ?? reservation.partySize;
+  if (rt.capacity < partySize) return fail(`The ${rt.name} fits up to ${rt.capacity} guests.`);
+
+  const free = rt.rooms.filter((room) => {
+    const overlapping = room.reservations.filter(
+      (r) =>
+        r.id !== reservation.id &&
+        r.status !== "CANCELLED" &&
+        r.checkInDate < checkOut &&
+        r.checkOutDate > checkIn
+    );
+    return overlapping.length === 0;
+  });
+  if (free.length === 0) return fail("No rooms of that type are available for those dates.");
+
+  const nights = nightsBetween(checkIn, checkOut);
+  const subtotal = rt.nightlyRate * nights;
+  const taxes = Math.round(subtotal * 0.12);
+  const total = subtotal + taxes;
+
+  const updated = await prisma.reservation.update({
+    where: { id: reservation.id },
+    data: {
+      guestName: args.guest_name ?? reservation.guestName,
+      partySize,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      nights,
+      roomTypeId: rt.id,
+      subtotalCents: subtotal,
+      taxesCents: taxes,
+      totalCents: total
+    }
+  });
+
+  await logEvent({
+    reservationId: updated.id,
+    sessionId: ctx.sessionId,
+    kind: "RESERVATION_HOLD",
+    label: `Hold updated · ${rt.name} (${nights} nights)`,
+    metadata: { code: updated.code }
+  });
+
+  return ok({
+    reservation_code: updated.code,
+    guest_name: updated.guestName,
+    room_type: rt.name,
+    room_type_slug: rt.slug,
+    check_in_date: checkIn.toISOString().slice(0, 10),
+    check_out_date: checkOut.toISOString().slice(0, 10),
+    nights,
+    party_size: partySize,
+    nightly_rate_usd: rt.nightlyRate / 100,
+    subtotal_usd: subtotal / 100,
+    taxes_usd: taxes / 100,
+    total_usd: total / 100,
+    status: "HOLD"
+  });
+}
+
+export async function cancel_reservation(
+  args: { reservation_code: string },
+  ctx: { sessionId?: string }
+) {
+  const r = await prisma.reservation.findUnique({
+    where: { code: args.reservation_code.trim().toUpperCase() }
+  });
+  if (!r) return fail("Reservation not found.");
+  if (r.status === "CANCELLED") {
+    return ok({ reservation_code: r.code, status: "CANCELLED", already_cancelled: true });
+  }
+  const updated = await prisma.reservation.update({
+    where: { id: r.id },
+    data: { status: "CANCELLED", roomId: null }
+  });
+  await logEvent({
+    reservationId: updated.id,
+    sessionId: ctx.sessionId,
+    kind: "RESERVATION_CANCELLED",
+    label: `Reservation ${updated.code} cancelled`,
+    metadata: { code: updated.code }
+  });
+  return ok({ reservation_code: updated.code, status: "CANCELLED" });
+}
+
+export async function set_payment_details(_args: {
+  card_name?: string;
+  card_number?: string;
+  expiry?: string;
+  cvv?: string;
+}) {
+  // Sensitive card data is intentionally NOT stored or logged here. This tool
+  // only acknowledges receipt so the client can populate the on-screen form;
+  // the real card number, expiry, and CVV never touch the database.
+  return ok({ received: true });
+}
+
 export async function confirm_checkout(
   args: { reservation_code: string; card_last4?: string; card_brand?: string },
   ctx: { sessionId?: string }
@@ -335,6 +483,81 @@ export async function get_active_reservation(args: { reservation_code: string })
     check_out_date: r.checkOutDate.toISOString().slice(0, 10),
     nights: r.nights,
     total_usd: r.totalCents / 100
+  });
+}
+
+export async function resume_reservation(args: {
+  reservation_code?: string;
+  room_number?: string;
+  guest_name?: string;
+}) {
+  // Concierge needs a confirmed stay. Match forgivingly because names and
+  // codes come from speech transcription (one wrong letter is common).
+  const all = await prisma.reservation.findMany({
+    where: { status: "CONFIRMED" },
+    include: { room: true, roomType: true },
+    orderBy: { confirmedAt: "desc" }
+  });
+  const norm = (s: string) => s.replace(/[^a-z0-9]/gi, "").toUpperCase();
+
+  let candidates = all;
+  if (args.reservation_code) {
+    const code = norm(args.reservation_code);
+    const alt = code.startsWith("MS") ? code : `MS${code}`;
+    candidates = all.filter((x) => {
+      const c = norm(x.code);
+      return c === code || c === alt || (code.length >= 4 && c.endsWith(code));
+    });
+  } else if (args.room_number) {
+    const rn = args.room_number.trim().toLowerCase();
+    candidates = all.filter((x) => (x.room?.number ?? "").toLowerCase() === rn);
+  } else if (args.guest_name) {
+    const target = args.guest_name.trim().toLowerCase().replace(/\s+/g, " ");
+    const exact = all.filter((x) => x.guestName.toLowerCase() === target);
+    candidates =
+      exact.length > 0
+        ? exact
+        : all.filter((x) => {
+            const g = x.guestName.toLowerCase();
+            return g.includes(target) || target.includes(g);
+          });
+  } else {
+    return fail("Please give me the name on the booking, your room number, or a reservation code.");
+  }
+
+  if (candidates.length === 0) {
+    return fail("I couldn't find a confirmed booking with those details.");
+  }
+  if (candidates.length > 1) {
+    return fail(
+      "There are a few bookings that match — could you tell me your room number or reservation code?",
+      { needs_disambiguation: true, rooms: candidates.map((c) => c.room?.number).filter(Boolean) }
+    );
+  }
+  const r: any = candidates[0];
+  if (!r.room) {
+    return fail("That reservation isn't checked in yet, so concierge services aren't available.");
+  }
+
+  return ok({
+    reservation: {
+      reservation_code: r.code,
+      guest_name: r.guestName,
+      room_type: r.roomType!.name,
+      room_type_slug: r.roomType!.slug,
+      check_in_date: r.checkInDate.toISOString().slice(0, 10),
+      check_out_date: r.checkOutDate.toISOString().slice(0, 10),
+      nights: r.nights,
+      party_size: r.partySize,
+      nightly_rate_usd: r.roomType!.nightlyRate / 100,
+      subtotal_usd: r.subtotalCents / 100,
+      taxes_usd: r.taxesCents / 100,
+      total_usd: r.totalCents / 100,
+      status: "CONFIRMED",
+      room_number: r.room.number,
+      card_brand: r.cardBrand,
+      card_last4: r.cardLast4
+    }
   });
 }
 
@@ -665,8 +888,14 @@ export async function reply_to_guest(args: { message_id: string; body: string })
 export const CUSTOMER_HANDLERS = {
   get_room_options,
   get_room_details,
+  show_room_amenities,
+  close_room_details,
+  set_payment_details,
+  resume_reservation,
   check_availability,
   create_reservation_hold,
+  modify_reservation_hold,
+  cancel_reservation,
   confirm_checkout,
   get_active_reservation,
   get_menu_items,

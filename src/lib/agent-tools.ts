@@ -42,6 +42,27 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
+    name: "show_room_amenities",
+    description:
+      "Open a detailed features & amenities panel (lightbox) for a room type on the guest's screen. Only call this AFTER the guest confirms they want to see more details. It does not book anything and does not change the booking flow.",
+    parameters: {
+      type: "object",
+      properties: {
+        room_type_slug: { type: "string" }
+      },
+      required: ["room_type_slug"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "close_room_details",
+    description:
+      "Close the room features & amenities panel once the guest has finished looking at it.",
+    parameters: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    type: "function",
     name: "check_availability",
     description:
       "Check whether rooms of any/all types are available between the given check-in and check-out dates for the party size.",
@@ -88,6 +109,56 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
+    name: "modify_reservation_hold",
+    description:
+      "Change an existing HOLD reservation before checkout — update the room type, check-in/out dates, number of guests, or the guest name. Only include the fields that change; the price is recalculated automatically. Read the new total back to the guest afterward.",
+    parameters: {
+      type: "object",
+      properties: {
+        reservation_code: { type: "string" },
+        guest_name: { type: "string" },
+        room_type_slug: { type: "string" },
+        check_in_date: { type: "string" },
+        check_out_date: { type: "string" },
+        party_size: { type: "integer", minimum: 1, maximum: 8 }
+      },
+      required: ["reservation_code"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "cancel_reservation",
+    description:
+      "Cancel a reservation by its code (a hold before checkout, or a confirmed stay). This frees the room and clears the booking from the journey. Always confirm with the guest before calling.",
+    parameters: {
+      type: "object",
+      properties: {
+        reservation_code: { type: "string" }
+      },
+      required: ["reservation_code"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "set_payment_details",
+    description:
+      "Fill the on-screen secure payment form with the card details the guest provides by voice. Collect them first, then call this. Never read the full card number or security code back aloud. Sensitive values are discarded server-side and never stored.",
+    parameters: {
+      type: "object",
+      properties: {
+        card_name: { type: "string", description: "Cardholder name." },
+        card_number: { type: "string" },
+        expiry: { type: "string", description: "Expiry, e.g. 09/29." },
+        cvv: { type: "string", description: "Security code." }
+      },
+      required: ["card_number"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
     name: "confirm_checkout",
     description:
       "Confirm and complete the checkout for an existing reservation_code. The payment is processed and the room is assigned. Returns the assigned room number and the booking receipt.",
@@ -111,6 +182,21 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
         reservation_code: { type: "string" }
       },
       required: ["reservation_code"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
+    name: "resume_reservation",
+    description:
+      "Look up the guest's CONFIRMED reservation and open their concierge area (room service & lobby messaging) from any screen. Prefer the name on the booking. If more than one booking shares that name, the tool will ask you to disambiguate — then call again with the room_number or reservation_code.",
+    parameters: {
+      type: "object",
+      properties: {
+        guest_name: { type: "string", description: "The name on the booking (preferred)." },
+        room_number: { type: "string", description: "Room number, to disambiguate same-name bookings." },
+        reservation_code: { type: "string", description: "Reservation code, to disambiguate same-name bookings." }
+      },
       additionalProperties: false
     }
   },

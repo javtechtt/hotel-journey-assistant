@@ -50,6 +50,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   const pendingCallsRef = useRef<
     Map<string, { name: string; args_buffer: string; call_id: string }>
   >(new Map());
+  // Each function call surfaces via BOTH function_call_arguments.done and
+  // output_item.done — track handled call_ids so we execute (and respond) once.
+  const processedCallsRef = useRef<Set<string>>(new Set());
   // Only one response may be active at a time. Track whether one is in
   // flight, and whether a tool follow-up response is queued behind it.
   const responseActiveRef = useRef(false);
@@ -170,6 +173,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
           item?.arguments || event.arguments || pending?.args_buffer || "{}";
         pendingCallsRef.current.delete(id);
         if (!name || !callId) return;
+        // De-dupe: both *.done events fire for one call — handle it once.
+        if (processedCallsRef.current.has(callId)) return;
+        processedCallsRef.current.add(callId);
         let parsed: Record<string, unknown> = {};
         try {
           parsed = argsRaw ? JSON.parse(argsRaw) : {};
@@ -201,6 +207,7 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     setStatus("connecting");
     responseActiveRef.current = false;
     followupQueuedRef.current = false;
+    processedCallsRef.current.clear();
     try {
       const headers: Record<string, string> = { "Content-Type": "application/json" };
       if (opts.agent === "admin" && opts.adminPin) {

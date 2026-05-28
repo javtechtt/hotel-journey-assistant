@@ -33,7 +33,8 @@ export async function POST(req: Request) {
     model: REALTIME_MODEL,
     instructions: ADMIN_AGENT_INSTRUCTIONS,
     tools: ADMIN_TOOLS,
-    voice: "verse"
+    voice: process.env.OPENAI_REALTIME_VOICE_ADMIN || "verse",
+    speed: Number(process.env.OPENAI_REALTIME_SPEED) || 1.1
   });
 
   if (!result.ok) {
