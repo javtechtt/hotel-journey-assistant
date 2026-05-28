@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { CUSTOMER_TOOLS } from "@/lib/agent-tools";
-import { CUSTOMER_AGENT_INSTRUCTIONS } from "@/lib/agent-prompts";
+import { CUSTOMER_AGENT_INSTRUCTIONS, currentDateContext } from "@/lib/agent-prompts";
 import { createRealtimeClientSecret } from "@/lib/realtime-session";
 
 export const runtime = "nodejs";
@@ -23,7 +23,7 @@ export async function POST() {
   const result = await createRealtimeClientSecret({
     apiKey,
     model: REALTIME_MODEL,
-    instructions: CUSTOMER_AGENT_INSTRUCTIONS,
+    instructions: CUSTOMER_AGENT_INSTRUCTIONS + currentDateContext(),
     tools: CUSTOMER_TOOLS,
     voice: process.env.OPENAI_REALTIME_VOICE || "sage",
     speed: Number(process.env.OPENAI_REALTIME_SPEED) || 1.1
