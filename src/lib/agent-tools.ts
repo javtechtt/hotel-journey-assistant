@@ -2,6 +2,9 @@
 // These are forwarded to OpenAI Realtime via the session config; the model
 // emits function calls that the client posts to /api/agent-tool, where they
 // are validated, executed, and the result is fed back as a tool output.
+//
+// Each description follows a consistent shape — "What: … When: … Note: …" —
+// so the model can pick the right tool reliably.
 
 export type ToolDef = {
   type: "function";
@@ -15,14 +18,14 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "get_session_state",
     description:
-      "Return where the guest currently is in their journey and any active reservation. Call this at the START of every connection (including after the guest pauses and resumes the voice session) so you continue from the live on-screen state instead of starting over. This is the source of truth for the current state — do not assume or reset it yourself.",
+      "What: returns where the guest currently is in the journey and any active reservation. When: at the START of every connection, including after the guest pauses and resumes the voice session. Note: this is the source of truth for the current state — never assume or reset it yourself.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "go_to_stage",
     description:
-      "Move the on-screen view to a part of the journey when the guest asks to go back to, return to, or jump to it. ALWAYS call this to actually navigate — never claim to have moved them without calling it. Destinations are only reachable when valid (e.g. checkout needs a pending hold, concierge needs a confirmed reservation).",
+      "What: moves the on-screen view to a section of the journey. When: the guest asks to go back to, return to, or jump to the rooms, dates, checkout, confirmation, or concierge. Note: always call this to navigate — never claim a move without it; destinations only work when valid (checkout needs a pending hold, concierge needs a confirmed reservation).",
     parameters: {
       type: "object",
       properties: {
@@ -40,7 +43,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "get_room_options",
     description:
-      "Return the full catalog of room types the hotel offers, with mood, capacity, and nightly rate. Call this near the start of the conversation to show the guest what's available.",
+      "What: shows the full catalog of room types (mood, capacity, nightly rate) on screen. When: the guest wants to browse, or return to, the rooms. Note: don't read the list aloud — let the cards speak.",
     parameters: {
       type: "object",
       properties: {},
@@ -51,7 +54,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "get_room_details",
     description:
-      "Return rich detail for one room type (description, amenities, view, bed config, rate).",
+      "What: showcases one room type on screen with its full detail (description, amenities, view, bed config, rate). When: the guest asks to see a specific room. Note: call immediately, without confirmation or announcement.",
     parameters: {
       type: "object",
       properties: {
@@ -69,7 +72,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "show_room_amenities",
     description:
-      "Open a detailed features & amenities panel (lightbox) for a room type on the guest's screen. Only call this AFTER the guest confirms they want to see more details. It does not book anything and does not change the booking flow.",
+      "What: opens a detailed features & amenities panel for a room type on the guest's screen. When: the guest asks to see more details or amenities. Note: it doesn't book anything; call close_room_details when they're finished.",
     parameters: {
       type: "object",
       properties: {
@@ -83,14 +86,14 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "close_room_details",
     description:
-      "Close the room features & amenities panel once the guest has finished looking at it.",
+      "What: closes the room features & amenities panel. When: the guest has finished looking at it.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "check_availability",
     description:
-      "Check whether rooms of any/all types are available between the given check-in and check-out dates for the party size.",
+      "What: checks which room types are open between the given check-in and check-out dates for the party size. When: you have the dates and guest count. Note: pass dates as YYYY-MM-DD.",
     parameters: {
       type: "object",
       properties: {
@@ -112,7 +115,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "create_reservation_hold",
     description:
-      "Place a soft hold on a room for the guest. Returns a reservation_code and a pricing breakdown. The hold is not yet a confirmed booking.",
+      "What: places a soft hold on a room and returns a reservation_code and pricing breakdown. When: the guest agrees to book, after you've taken the name. Note: a hold is not yet a confirmed booking.",
     parameters: {
       type: "object",
       properties: {
@@ -136,7 +139,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "modify_reservation_hold",
     description:
-      "Change an existing HOLD reservation before checkout — update the room type, check-in/out dates, number of guests, or the guest name. Only include the fields that change; the price is recalculated automatically. Read the new total back to the guest afterward.",
+      "What: changes a HOLD before checkout — room type, dates, guest count, or name (include only the fields that change; price recalculates). When: the guest wants to adjust a pending hold. Note: read the new total back afterward.",
     parameters: {
       type: "object",
       properties: {
@@ -155,7 +158,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "cancel_reservation",
     description:
-      "Cancel a reservation by its code (a hold before checkout, or a confirmed stay). This frees the room and clears the booking from the journey. Always confirm with the guest before calling.",
+      "What: cancels a reservation by code (a hold or a confirmed stay), freeing the room and clearing it from the journey. When: the guest wants to cancel. Note: confirm with the guest before calling.",
     parameters: {
       type: "object",
       properties: {
@@ -169,7 +172,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "set_payment_details",
     description:
-      "Fill the on-screen secure payment form with the card details the guest provides by voice. Collect them first, then call this. Never read the full card number or security code back aloud. Sensitive values are discarded server-side and never stored.",
+      "What: fills the on-screen secure payment form with the card details the guest gives by voice. When: at checkout, after you've collected the details. Note: never read the full card number or security code back aloud; sensitive values are discarded server-side and never stored.",
     parameters: {
       type: "object",
       properties: {
@@ -186,7 +189,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "confirm_checkout",
     description:
-      "Confirm and complete the checkout for an existing reservation_code. The payment is processed and the room is assigned. Returns the assigned room number and the booking receipt.",
+      "What: completes checkout for a reservation_code — authorizes payment and assigns the room; returns the room number and booking receipt. When: the guest says to confirm or complete the booking.",
     parameters: {
       type: "object",
       properties: {
@@ -200,7 +203,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "resume_reservation",
     description:
-      "Look up the guest's CONFIRMED reservation and open their concierge area (room service & lobby messaging) from any screen. Prefer the name on the booking. If more than one booking shares that name, the tool will ask you to disambiguate — then call again with the room_number or reservation_code.",
+      "What: looks up a CONFIRMED reservation and opens the guest's concierge area (room service & lobby messaging) from any screen. When: a returning, booked guest wants room service or to message the front desk. Note: prefer the name on the booking; if it reports more than one match, call again with room_number or reservation_code.",
     parameters: {
       type: "object",
       properties: {
@@ -214,7 +217,8 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   {
     type: "function",
     name: "get_menu_items",
-    description: "Return the room-service / concierge menu.",
+    description:
+      "What: shows the room-service & concierge menu on screen. When: the guest wants to order or see what's available.",
     parameters: {
       type: "object",
       properties: {},
@@ -225,7 +229,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "place_room_service_order",
     description:
-      "Place a room-service order. Requires a confirmed reservation_code; the order is automatically routed to that guest's assigned room.",
+      "What: places a room-service order, automatically routed to the guest's assigned room. When: the guest orders items. Note: requires a confirmed reservation_code.",
     parameters: {
       type: "object",
       properties: {
@@ -252,7 +256,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "send_lobby_message",
     description:
-      "Send a message from the guest to the lobby/front desk. Requires a confirmed reservation_code.",
+      "What: sends the guest's message to the lobby/front desk. When: the guest wants to tell or ask the front desk something. Note: requires a confirmed reservation_code.",
     parameters: {
       type: "object",
       properties: {
@@ -266,7 +270,8 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   {
     type: "function",
     name: "get_reservation_journey",
-    description: "Return the journey timeline for a reservation_code.",
+    description:
+      "What: returns the journey timeline for a reservation_code. When: you need the guest's history.",
     parameters: {
       type: "object",
       properties: {
@@ -282,19 +287,22 @@ export const ADMIN_TOOLS: ToolDef[] = [
   {
     type: "function",
     name: "get_admin_dashboard",
-    description: "Return summary counts and headline stats for the lobby terminal.",
+    description:
+      "What: returns summary counts and headline stats for the lobby terminal. When: staff want an overview.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "get_all_active_stays",
-    description: "Return all currently confirmed/active reservations with room numbers.",
+    description:
+      "What: returns all currently confirmed/active reservations with room numbers. When: staff want the current stays.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "get_room_journey",
-    description: "Return the journey timeline for a reservation code OR a room number.",
+    description:
+      "What: returns a guest's journey timeline by reservation code OR room number. When: staff want to inspect one guest's activity.",
     parameters: {
       type: "object",
       properties: {
@@ -307,14 +315,15 @@ export const ADMIN_TOOLS: ToolDef[] = [
   {
     type: "function",
     name: "get_pending_orders",
-    description: "Return all room-service orders that are not yet delivered or cancelled.",
+    description:
+      "What: returns all room-service orders not yet delivered or cancelled. When: staff want to see outstanding orders.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "update_order_status",
     description:
-      "Update the status of a room-service order. Status must be one of RECEIVED, PREPARING, EN_ROUTE, DELIVERED, CANCELLED.",
+      "What: updates a room-service order's status (RECEIVED, PREPARING, EN_ROUTE, DELIVERED, or CANCELLED). When: staff advance or cancel an order. Note: confirm with the staff member before calling.",
     parameters: {
       type: "object",
       properties: {
@@ -331,13 +340,15 @@ export const ADMIN_TOOLS: ToolDef[] = [
   {
     type: "function",
     name: "get_lobby_messages",
-    description: "Return all guest lobby messages, newest first.",
+    description:
+      "What: returns all guest lobby messages, newest first. When: staff want to review messages.",
     parameters: { type: "object", properties: {}, additionalProperties: false }
   },
   {
     type: "function",
     name: "reply_to_guest",
-    description: "Send a staff reply to a guest's lobby message.",
+    description:
+      "What: sends a staff reply to a guest's lobby message. When: staff respond to a guest.",
     parameters: {
       type: "object",
       properties: {
