@@ -61,6 +61,8 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   // flight, and whether a tool follow-up response is queued behind it.
   const responseActiveRef = useRef(false);
   const followupQueuedRef = useRef(false);
+  // True while the guest is speaking (used to detect/handle barge-in).
+  const userSpeakingRef = useRef(false);
 
   // Request a follow-up response after tool output(s). If a response is still
   // streaming, defer until response.done; otherwise fire immediately. A short
@@ -127,10 +129,13 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
         if (finalText) appendTurn({ id, role: "assistant", text: finalText, partial: false });
       }
 
-      // Status hints
+      // Status hints + barge-in tracking
       else if (type === "input_audio_buffer.speech_started") {
+        // The guest started talking — this is a barge-in if the agent is mid-reply.
+        userSpeakingRef.current = true;
         setStatus("listening");
       } else if (type === "input_audio_buffer.speech_stopped") {
+        userSpeakingRef.current = false;
         setStatus("thinking");
       } else if (type === "response.created") {
         responseActiveRef.current = true;
@@ -138,11 +143,15 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
       } else if (type === "response.done") {
         responseActiveRef.current = false;
         setStatus("listening");
-        // A tool result arrived mid-response — now it's safe to respond.
         if (followupQueuedRef.current) {
           followupQueuedRef.current = false;
-          responseActiveRef.current = true;
-          clientRef.current?.createResponse();
+          // Don't fire a tool follow-up while the guest is barging in — the
+          // tool output is already in the conversation and folds into their
+          // next turn, so a competing response can't collide.
+          if (!userSpeakingRef.current) {
+            responseActiveRef.current = true;
+            clientRef.current?.createResponse();
+          }
         }
       }
 
@@ -211,6 +220,7 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     setStatus("connecting");
     responseActiveRef.current = false;
     followupQueuedRef.current = false;
+    userSpeakingRef.current = false;
     processedCallsRef.current.clear();
     meterRef.current?.stop();
     meterRef.current = new AudioMeter((l) => {

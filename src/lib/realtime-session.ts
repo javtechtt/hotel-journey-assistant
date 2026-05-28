@@ -33,14 +33,17 @@ export async function createRealtimeClientSecret(opts: {
           audio: {
             input: {
               transcription: { model: "whisper-1" },
-              // Higher threshold + a touch more silence so residual speaker
-              // echo and room noise don't falsely trigger / interrupt.
+              // Barge-in: the guest can interrupt the agent at any time. Echo
+              // cancellation (set on the mic) removes the agent's own voice, so
+              // the threshold can stay responsive; interrupt_response lets real
+              // speech cancel the in-progress reply.
               turn_detection: {
                 type: "server_vad",
-                threshold: 0.65,
+                threshold: 0.55,
                 prefix_padding_ms: 300,
-                silence_duration_ms: 650,
-                create_response: true
+                silence_duration_ms: 550,
+                create_response: true,
+                interrupt_response: true
               }
             },
             output: { voice: opts.voice, speed: opts.speed ?? 1.0 }
