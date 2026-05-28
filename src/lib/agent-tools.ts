@@ -25,14 +25,14 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "go_to_stage",
     description:
-      "What: moves the on-screen view to a section of the journey. When: the guest asks to go back to, return to, or jump to the rooms, dates, checkout, confirmation, or concierge. Note: always call this to navigate — never claim a move without it; destinations only work when valid (checkout needs a pending hold, concierge needs a confirmed reservation).",
+      "What: moves the on-screen view to a section of the journey. When: the guest asks to go back to, return to, or jump to the rooms, checkout, confirmation, or concierge. Note: always call this to navigate — never claim a move without it; destinations only work when valid (checkout needs a pending hold, concierge needs a confirmed reservation). Dates live within the rooms, so a request for 'the dates' goes to the rooms.",
     parameters: {
       type: "object",
       properties: {
         stage: {
           type: "string",
           description:
-            "Where to go: 'discovery' (browse rooms), 'availability' (dates), 'checkout', 'confirmation', or 'concierge' (room service & front desk)."
+            "Where to go: 'discovery' (browse rooms, where dates are chosen), 'checkout', 'confirmation', or 'concierge' (room service & front desk)."
         }
       },
       required: ["stage"],
@@ -115,7 +115,7 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "check_availability",
     description:
-      "What: checks which room types are open between the given check-in and check-out dates for the party size. When: you have the dates and guest count. Note: pass dates as YYYY-MM-DD.",
+      "What: checks which room types are open between the given check-in and check-out dates for the party size, and shows the result on the room currently being viewed (there is no separate availability screen). When: the moment you have the dates and guest count. Note: pass dates as YYYY-MM-DD; if the viewed room is unavailable for those dates or party size, suggest one alternative room that fits (show it with get_room_details) or offer to adjust the dates.",
     parameters: {
       type: "object",
       properties: {
@@ -312,7 +312,7 @@ export const ADMIN_TOOLS: ToolDef[] = [
     type: "function",
     name: "get_room_journey",
     description:
-      "What: returns a guest's journey timeline by reservation code OR room number. When: staff want to inspect one guest's activity.",
+      "What: returns a guest's full picture by reservation code OR room number — their journey timeline plus their current room-service orders and front-desk messages with statuses, and counts of pending orders / open messages. When: staff want to inspect or recap one guest's activity and outstanding requests.",
     parameters: {
       type: "object",
       properties: {

@@ -39,6 +39,7 @@ type Dashboard = {
   orders: Array<{
     id: string;
     room_number: string;
+    reservation_code: string;
     guest_name: string;
     status: string;
     total_cents: number;
@@ -48,6 +49,7 @@ type Dashboard = {
   messages: Array<{
     id: string;
     room_number: string;
+    reservation_code: string;
     guest_name: string;
     body: string;
     status: string;
@@ -65,6 +67,16 @@ type Dashboard = {
 };
 
 const ORDER_FLOW = ["RECEIVED", "PREPARING", "EN_ROUTE", "DELIVERED"] as const;
+
+// One guest's full workspace: their reservation plus every request and event.
+type GuestGroup = {
+  reservation: Dashboard["reservations"][number];
+  orders: Dashboard["orders"];
+  messages: Dashboard["messages"];
+  events: JourneyEventWire[];
+  pendingOrders: number;
+  openMessages: number;
+};
 
 export default function AdminPage() {
   const [pin, setPin] = useState("");
@@ -93,14 +105,32 @@ export default function AdminPage() {
     return () => clearInterval(t);
   }, [authedPin, fetchDashboard]);
 
-  const focusReservation = useMemo(
-    () => dash?.reservations.find((r) => r.code === focusCode) ?? null,
-    [dash, focusCode]
+  // Group every reservation into a single guest "card" — its orders, front-desk
+  // messages, and journey events — so staff see one focused workspace per guest
+  // instead of three flat, mixed lists.
+  const guests = useMemo<GuestGroup[]>(() => {
+    if (!dash) return [];
+    return dash.reservations.map((r) => {
+      const orders = dash.orders.filter((o) => o.reservation_code === r.code);
+      const messages = dash.messages.filter((m) => m.reservation_code === r.code);
+      const events = dash.events
+        .filter((e) => e.reservation_code === r.code)
+        .slice()
+        .reverse();
+      return {
+        reservation: r,
+        orders,
+        messages,
+        events,
+        pendingOrders: orders.filter((o) => !["DELIVERED", "CANCELLED"].includes(o.status)).length,
+        openMessages: messages.filter((m) => m.status === "OPEN").length
+      };
+    });
+  }, [dash]);
+  const selected = useMemo(
+    () => guests.find((g) => g.reservation.code === focusCode) ?? null,
+    [guests, focusCode]
   );
-  const focusEvents = useMemo<JourneyEventWire[]>(() => {
-    if (!dash || !focusCode) return [];
-    return dash.events.filter((e) => e.reservation_code === focusCode).slice().reverse();
-  }, [dash, focusCode]);
 
   const updateOrderStatus = async (orderId: string, status: string) => {
     if (!authedPin) return;
@@ -204,16 +234,16 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative min-h-screen pb-44">
+    <main className="relative flex h-[100dvh] flex-col overflow-hidden pb-40">
       <StageAtmosphere aurora={["rgba(212,167,59,0.32)", "rgba(99,102,241,0.28)"]} />
       <BreathingEdges levelRef={voice.levelRef} status={voice.status} />
       <AudioSink stream={voice.audioStream} />
 
-      <div className="relative z-10 mx-auto max-w-[1480px] px-6 pt-8 lg:px-10">
-        <header className="flex items-center justify-between">
+      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-[1480px] flex-1 flex-col px-6 pt-6 lg:px-10">
+        <header className="flex shrink-0 items-center justify-between">
           <div>
             <div className="text-[11px] uppercase tracking-luxe text-gold-200/70">Lobby Terminal</div>
-            <h1 className="font-display text-4xl text-gold mt-1">Operations</h1>
+            <h1 className="font-display text-3xl text-gold mt-0.5">Operations</h1>
           </div>
           <div className="flex items-center gap-4">
             <a href="/" className="text-[11px] uppercase tracking-[0.28em] text-white/35 hover:text-gold-200">
@@ -226,7 +256,7 @@ export default function AdminPage() {
         </header>
 
         {/* summary */}
-        <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <section className="mt-5 grid shrink-0 grid-cols-2 gap-3 lg:grid-cols-5">
           <Stat icon="key" label="Active stays" value={dash?.totals.active_stays ?? 0} />
           <Stat icon="calendar" label="Today" value={dash?.totals.reservations_today ?? 0} />
           <Stat icon="compass" label="Reservations" value={dash?.totals.reservations ?? 0} />
@@ -234,154 +264,49 @@ export default function AdminPage() {
           <Stat icon="chat" label="Open messages" value={dash?.totals.open_messages ?? 0} />
         </section>
 
-        <div className="mt-8 grid gap-7 lg:grid-cols-[1.9fr,1fr]">
-          <div className="space-y-7">
-            {/* reservations */}
-            <Panel title="Reservations" icon="compass">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-[10px] uppercase tracking-[0.2em] text-white/35">
-                      <th className="px-3 py-2 text-left font-normal">Code</th>
-                      <th className="px-3 py-2 text-left font-normal">Guest</th>
-                      <th className="px-3 py-2 text-left font-normal">Room</th>
-                      <th className="px-3 py-2 text-left font-normal">Stay</th>
-                      <th className="px-3 py-2 text-left font-normal">Status</th>
-                      <th className="px-3 py-2 text-right font-normal">Total</th>
-                      <th className="px-3 py-2 text-right font-normal"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {dash?.reservations.map((r) => (
-                      <tr
-                        key={r.code}
-                        onClick={() => setFocusCode(r.code)}
-                        className={cn(
-                          "cursor-pointer border-t border-white/5 transition hover:bg-white/[0.03]",
-                          focusCode === r.code && "bg-gold-500/10"
-                        )}
-                      >
-                        <td className="px-3 py-3 font-mono text-gold">{r.code}</td>
-                        <td className="px-3 py-3 text-sand-100">{r.guest_name}</td>
-                        <td className="px-3 py-3 text-white/80">
-                          {r.room_number ?? "—"} <span className="text-white/40">· {r.room_type}</span>
-                        </td>
-                        <td className="px-3 py-3 text-white/70">
-                          {formatDate(r.check_in_date)} → {formatDate(r.check_out_date)}
-                        </td>
-                        <td className="px-3 py-3"><StatusPill status={r.status} /></td>
-                        <td className="px-3 py-3 text-right text-sand-100">{formatMoney(r.total_cents)}</td>
-                        <td className="px-3 py-3 text-right">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteReservation(r.code);
-                            }}
-                            className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-rose-300/70 transition hover:border-rose-400/40 hover:text-rose-300"
-                          >
-                            delete
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                    {(dash?.reservations.length ?? 0) === 0 && (
-                      <tr>
-                        <td colSpan={7} className="py-6 text-center text-sm italic text-white/40">
-                          No reservations yet.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+        <div className="mt-6 grid min-h-0 flex-1 gap-6 lg:grid-cols-[1fr,320px]">
+          {/* guest cards — one focused workspace per guest */}
+          <div className="min-h-0 overflow-y-auto scrollbar-thin pr-1">
+            {guests.length === 0 ? (
+              <div className="grid h-full place-items-center">
+                <Empty text="No reservations yet." />
               </div>
-            </Panel>
-
-            {/* orders */}
-            <Panel title="Room-service orders" icon="bell">
-              <div className="space-y-3">
-                <AnimatePresence initial={false}>
-                  {dash?.orders.map((o) => (
-                    <motion.div
-                      key={o.id}
-                      layout
-                      initial={{ opacity: 0, y: 6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="rounded-2xl border border-white/8 bg-black/20 p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="text-sm text-sand-100">
-                          Room {o.room_number} <span className="text-white/40">· {o.guest_name}</span>
-                        </div>
-                        <div className="text-gold">{formatMoney(o.total_cents)}</div>
-                      </div>
-                      <div className="mt-1 text-xs text-white/55">
-                        {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {ORDER_FLOW.map((step) => {
-                          const reached = ORDER_FLOW.indexOf(o.status as any) >= ORDER_FLOW.indexOf(step);
-                          const current = o.status === step;
-                          return (
-                            <button
-                              key={step}
-                              onClick={() => updateOrderStatus(o.id, step)}
-                              className={cn(
-                                "rounded-full border px-3 py-1 text-[10px] uppercase tracking-widest transition",
-                                current
-                                  ? "border-gold-400 bg-gold-500/20 text-gold-200"
-                                  : reached
-                                  ? "border-gold-400/40 text-gold-200/70"
-                                  : "border-white/10 text-white/40 hover:border-white/30"
-                              )}
-                            >
-                              {step.replace("_", " ").toLowerCase()}
-                            </button>
-                          );
-                        })}
-                        <button
-                          onClick={() => updateOrderStatus(o.id, "CANCELLED")}
-                          className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-rose-300/70 hover:border-rose-400/40"
-                        >
-                          cancel
-                        </button>
-                      </div>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {(dash?.orders.length ?? 0) === 0 && <Empty text="No active orders." />}
-              </div>
-            </Panel>
-
-            {/* messages */}
-            <Panel title="Front-desk messages" icon="chat">
-              <div className="space-y-3">
-                {dash?.messages.map((m) => (
-                  <MessageRow key={m.id} message={m} onReply={replyToMessage} />
+            ) : (
+              <div className="grid auto-rows-min gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {guests.map((g) => (
+                  <GuestCard key={g.reservation.code} guest={g} onOpen={() => setFocusCode(g.reservation.code)} />
                 ))}
-                {(dash?.messages.length ?? 0) === 0 && <Empty text="No messages yet." />}
               </div>
-            </Panel>
+            )}
           </div>
 
-          {/* right rail */}
-          <aside className="space-y-7">
-            <Panel title="Voice terminal" icon="mic">
-              <TranscriptRail turns={voice.transcript} />
-            </Panel>
-            <Panel
-              title={focusReservation ? `Journey · ${focusReservation.code}` : "Journey timeline"}
-              icon="compass"
-            >
-              {focusReservation ? (
-                <JourneyRail events={focusEvents} />
-              ) : (
-                <Empty text="Select a reservation to inspect its journey." />
-              )}
-            </Panel>
+          {/* right rail — live voice transcript */}
+          <aside className="hidden min-h-0 flex-col lg:flex">
+            <div className="glass flex min-h-0 flex-1 flex-col rounded-[1.75rem] p-6">
+              <div className="mb-4 inline-flex shrink-0 items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-gold-200/70">
+                <Icon name="mic" className="h-4 w-4" /> Voice terminal
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto scrollbar-thin">
+                <TranscriptRail turns={voice.transcript} />
+              </div>
+            </div>
           </aside>
         </div>
       </div>
+
+      {/* full-screen guest workspace */}
+      <AnimatePresence>
+        {selected && (
+          <GuestModal
+            key={selected.reservation.code}
+            guest={selected}
+            onClose={() => setFocusCode(null)}
+            onUpdateOrder={updateOrderStatus}
+            onReply={replyToMessage}
+            onDelete={deleteReservation}
+          />
+        )}
+      </AnimatePresence>
 
       <VoiceDock
         status={voice.status}
@@ -398,23 +323,243 @@ export default function AdminPage() {
 
 function Stat({ icon, label, value }: { icon: IconName; label: string; value: number }) {
   return (
-    <div className="glass rounded-2xl p-5">
+    <div className="glass rounded-2xl p-3.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] uppercase tracking-[0.25em] text-white/45">{label}</span>
         <span className="text-gold-200/70"><Icon name={icon} className="h-4 w-4" /></span>
       </div>
-      <div className="mt-3 font-display text-4xl text-sand-100">{value}</div>
+      <div className="mt-1.5 font-display text-2xl text-sand-100">{value}</div>
     </div>
   );
 }
-function Panel({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) {
   return (
-    <div className="glass rounded-[1.75rem] p-6">
-      <div className="mb-4 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-gold-200/70">
+    <div>
+      <div className="mb-3 inline-flex items-center gap-2 text-[10px] uppercase tracking-[0.3em] text-gold-200/70">
         <Icon name={icon} className="h-4 w-4" /> {title}
       </div>
       {children}
     </div>
+  );
+}
+
+// A single guest's mini dashboard in the grid — status + request counts at a
+// glance; click to open the full workspace.
+function GuestCard({ guest, onOpen }: { guest: GuestGroup; onOpen: () => void }) {
+  const { reservation: r, orders, messages, pendingOrders, openMessages } = guest;
+  const attention = pendingOrders > 0 || openMessages > 0;
+  return (
+    <button
+      onClick={onOpen}
+      className={cn(
+        "glass flex w-full flex-col gap-3 rounded-2xl border p-5 text-left transition hover:border-gold-400/40",
+        attention ? "border-gold-400/40 ring-1 ring-gold-400/20" : "border-white/8"
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate font-display text-xl text-sand-100">{r.guest_name}</div>
+          <div className="mt-0.5 truncate text-xs text-white/55">
+            {r.room_number ? `Room ${r.room_number}` : "Unassigned"} · {r.room_type}
+          </div>
+        </div>
+        <StatusPill status={r.status} />
+      </div>
+      <div className="flex items-center justify-between text-xs text-white/55">
+        <span>
+          {formatDate(r.check_in_date)} → {formatDate(r.check_out_date)}
+        </span>
+        <span className="text-gold">{formatMoney(r.total_cents)}</span>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-2">
+        <CardBadge
+          icon="bell"
+          label={`${orders.length} ${orders.length === 1 ? "order" : "orders"}`}
+          active={pendingOrders > 0}
+          count={pendingOrders}
+        />
+        <CardBadge
+          icon="chat"
+          label={`${messages.length} ${messages.length === 1 ? "message" : "messages"}`}
+          active={openMessages > 0}
+          count={openMessages}
+        />
+        <span className="ml-auto font-mono text-[11px] text-gold/70">{r.code}</span>
+      </div>
+    </button>
+  );
+}
+function CardBadge({
+  icon,
+  label,
+  active,
+  count
+}: {
+  icon: IconName;
+  label: string;
+  active: boolean;
+  count: number;
+}) {
+  return (
+    <span
+      className={cn(
+        "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px]",
+        active ? "border-gold-400/40 bg-gold-500/10 text-gold-200" : "border-white/10 text-white/50"
+      )}
+    >
+      <Icon name={icon} className="h-3.5 w-3.5" /> {label}
+      {active && count > 0 && (
+        <span className="ml-0.5 rounded-full bg-gold-sheen px-1.5 text-[10px] font-semibold text-ink-900">
+          {count}
+        </span>
+      )}
+    </span>
+  );
+}
+
+// One room-service order with its status-advance controls (used in the modal).
+function OrderCard({
+  order,
+  onUpdate
+}: {
+  order: Dashboard["orders"][number];
+  onUpdate: (id: string, status: string) => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-white/8 bg-black/20 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-sand-100">
+          {order.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
+        </div>
+        <div className="shrink-0 text-gold">{formatMoney(order.total_cents)}</div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {ORDER_FLOW.map((step) => {
+          const reached = ORDER_FLOW.indexOf(order.status as (typeof ORDER_FLOW)[number]) >= ORDER_FLOW.indexOf(step);
+          const current = order.status === step;
+          return (
+            <button
+              key={step}
+              onClick={() => onUpdate(order.id, step)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-[10px] uppercase tracking-widest transition",
+                current
+                  ? "border-gold-400 bg-gold-500/20 text-gold-200"
+                  : reached
+                  ? "border-gold-400/40 text-gold-200/70"
+                  : "border-white/10 text-white/40 hover:border-white/30"
+              )}
+            >
+              {step.replace("_", " ").toLowerCase()}
+            </button>
+          );
+        })}
+        <button
+          onClick={() => onUpdate(order.id, "CANCELLED")}
+          className="rounded-full border border-white/10 px-3 py-1 text-[10px] uppercase tracking-widest text-rose-300/70 hover:border-rose-400/40"
+        >
+          cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Full-screen workspace for one guest: every request, status, and journey event.
+function GuestModal({
+  guest,
+  onClose,
+  onUpdateOrder,
+  onReply,
+  onDelete
+}: {
+  guest: GuestGroup;
+  onClose: () => void;
+  onUpdateOrder: (id: string, status: string) => void;
+  onReply: (id: string, body: string) => Promise<void>;
+  onDelete: (code: string) => void;
+}) {
+  const { reservation: r, orders, messages, events } = guest;
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="fixed inset-0 z-50 flex items-center justify-center px-4"
+    >
+      <div className="absolute inset-0 bg-black/55 backdrop-blur-md" onClick={onClose} />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.96, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 220, damping: 24 }}
+        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] glass-strong"
+      >
+        <div className="flex items-start justify-between gap-4 border-b border-white/8 px-7 py-5">
+          <div className="min-w-0">
+            <div className="flex items-center gap-3">
+              <h2 className="font-display text-2xl text-sand-100">{r.guest_name}</h2>
+              <StatusPill status={r.status} />
+            </div>
+            <div className="mt-1 text-sm text-white/55">
+              {r.room_number ? `Room ${r.room_number}` : "Unassigned"} · {r.room_type} ·{" "}
+              <span className="font-mono text-gold/80">{r.code}</span>
+            </div>
+            <div className="mt-1 text-xs text-white/45">
+              {formatDate(r.check_in_date)} → {formatDate(r.check_out_date)} · {r.nights}{" "}
+              {r.nights === 1 ? "night" : "nights"} · {formatMoney(r.total_cents)}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              onClick={() => onDelete(r.code)}
+              className="rounded-full border border-white/10 px-3 py-1.5 text-[10px] uppercase tracking-widest text-rose-300/70 transition hover:border-rose-400/40 hover:text-rose-300"
+            >
+              delete
+            </button>
+            <button
+              onClick={onClose}
+              className="grid h-9 w-9 place-items-center rounded-full border border-white/10 text-white/60 transition hover:text-white"
+              aria-label="Close"
+            >
+              <Icon name="close" className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto scrollbar-thin px-7 py-6 lg:grid-cols-2">
+          <div className="space-y-6">
+            <Section title="Room-service orders" icon="bell">
+              {orders.length === 0 ? (
+                <Empty text="No orders." />
+              ) : (
+                <div className="space-y-3">
+                  {orders.map((o) => (
+                    <OrderCard key={o.id} order={o} onUpdate={onUpdateOrder} />
+                  ))}
+                </div>
+              )}
+            </Section>
+            <Section title="Front-desk messages" icon="chat">
+              {messages.length === 0 ? (
+                <Empty text="No messages." />
+              ) : (
+                <div className="space-y-3">
+                  {messages.map((m) => (
+                    <MessageRow key={m.id} message={m} onReply={onReply} />
+                  ))}
+                </div>
+              )}
+            </Section>
+          </div>
+          <Section title="Journey" icon="compass">
+            {events.length === 0 ? <Empty text="No journey events yet." /> : <JourneyRail events={events} />}
+          </Section>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
 function Empty({ text }: { text: string }) {

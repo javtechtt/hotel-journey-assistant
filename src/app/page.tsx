@@ -9,14 +9,15 @@ import { VoiceDock } from "@/components/VoiceDock";
 import { AudioSink } from "@/components/AudioSink";
 import { WelcomeStage } from "@/components/stages/WelcomeStage";
 import { DiscoveryStage } from "@/components/stages/DiscoveryStage";
-import { AvailabilityStage } from "@/components/stages/AvailabilityStage";
 import { CheckoutStage, type PaymentPrefill } from "@/components/stages/CheckoutStage";
 import { ConfirmationStage } from "@/components/stages/ConfirmationStage";
 import { ConciergeStage } from "@/components/stages/ConciergeStage";
 import { RoomAmenitiesLightbox } from "@/components/RoomAmenitiesLightbox";
+import { RequestsCart } from "@/components/RequestsCart";
 import { StayCalendar } from "@/components/StayCalendar";
 import { useRealtimeVoice, type ToolCallEvent } from "@/lib/use-realtime-voice";
 import { roomVisual } from "@/lib/room-visuals";
+import { formatDate } from "@/lib/format";
 import { POLL_INTERVAL_MS } from "@/lib/config";
 import {
   normalizeRoom,
@@ -237,7 +238,8 @@ export default function CustomerPage() {
       else if (/concierge|service|lobby|menu|front.?desk|order/.test(raw)) dest = confirmed ? "concierge" : null;
       else if (/confirm|receipt/.test(raw)) dest = confirmed ? "confirmed" : null;
       else if (/checkout|payment|\bpay\b/.test(raw)) dest = hold ? "checkout" : null;
-      else if (/avail|date/.test(raw)) dest = s.hasAvailability ? "availability" : null;
+      // Dates now live within the room view — "the dates" returns to the rooms.
+      else if (/avail|date/.test(raw)) dest = s.focusedSlug ? "roomDetail" : "discovery";
       else if (/detail|selected/.test(raw)) dest = s.focusedSlug ? "roomDetail" : "discovery";
       else if (/discover|room|browse|collection|gallery|stay/.test(raw)) dest = "discovery";
       if (dest) {
@@ -322,10 +324,12 @@ export default function CustomerPage() {
             break;
           case "check_availability":
             if (d) {
+              // No separate availability screen — the result is shown inline on
+              // the room being viewed (its "X available" / "Sold out" badge), so
+              // the guest stays in the room dialogue.
               setAvailability(d as AvailabilityWire);
-              setStayDraft({}); // the availability stage shows the dates now
+              setStayDraft({});
               setCalendarOpen(false);
-              setStage("availability");
             }
             break;
           case "create_reservation_hold":
@@ -452,6 +456,16 @@ export default function CustomerPage() {
     return a.rooms_available > 0 ? `${a.rooms_available} available` : "Sold out";
   }, [availability, focusedSlug]);
 
+  // Once dates are chosen the calendar closes, so the focused room carries the
+  // stay (dates + guests) as a chip — keeping dates part of the room dialogue.
+  const stayLabelForFocused = useMemo(() => {
+    if (!availability) return undefined;
+    const { check_in_date, check_out_date, party_size } = availability;
+    return `${formatDate(check_in_date)} – ${formatDate(check_out_date)} · ${party_size} ${
+      party_size === 1 ? "guest" : "guests"
+    }`;
+  }, [availability]);
+
   const aurora = roomVisual(focusedSlug ?? reservation?.room_type_slug).aurora;
 
   // Live highlight: highlight a room only at the moment the assistant *newly*
@@ -546,13 +560,10 @@ export default function CustomerPage() {
               highlightSlug={stage === "discovery" ? spokenSlug : null}
               focusMode={stage === "roomDetail"}
               availabilityLabel={availabilityLabelForFocused}
+              stayLabel={stayLabelForFocused}
               onSelect={selectRoomLocally}
               onClose={() => setStage("discovery")}
             />
-          )}
-
-          {stage === "availability" && availability && (
-            <AvailabilityStage key="availability" data={availability} focusedSlug={focusedSlug} />
           )}
 
           {stage === "checkout" && reservation && (
@@ -573,13 +584,7 @@ export default function CustomerPage() {
           )}
 
           {stage === "concierge" && reservation && (
-            <ConciergeStage
-              key="concierge"
-              reservation={reservation}
-              menu={menu}
-              orders={orders}
-              messages={messages}
-            />
+            <ConciergeStage key="concierge" reservation={reservation} menu={menu} />
           )}
         </AnimatePresence>
       </div>
@@ -603,6 +608,12 @@ export default function CustomerPage() {
           />
         )}
       </AnimatePresence>
+
+      {/* Pending-requests cart — every room-service & front-desk request, with
+          live status, once the guest has a confirmed reservation. */}
+      {reservation?.status === "CONFIRMED" && (
+        <RequestsCart orders={orders} messages={messages} />
+      )}
 
       <VoiceDock
         status={voice.status}

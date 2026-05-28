@@ -26,6 +26,7 @@ export function DiscoveryStage({
   highlightSlug,
   focusMode,
   availabilityLabel,
+  stayLabel,
   onSelect,
   onClose
 }: {
@@ -34,6 +35,7 @@ export function DiscoveryStage({
   highlightSlug: string | null;
   focusMode: boolean;
   availabilityLabel?: string;
+  stayLabel?: string;
   onSelect: (slug: string) => void;
   onClose: () => void;
 }) {
@@ -98,7 +100,12 @@ export function DiscoveryStage({
             onClick={onClose}
             className="absolute inset-0 z-20 flex items-center justify-center px-4"
           >
-            <FocusedRoom rt={focused} availabilityLabel={availabilityLabel} onClose={onClose} />
+            <FocusedRoom
+              rt={focused}
+              availabilityLabel={availabilityLabel}
+              stayLabel={stayLabel}
+              onClose={onClose}
+            />
           </motion.div>
         )}
       </AnimatePresence>
@@ -115,10 +122,12 @@ const HINTS: { label: string; icon: IconName }[] = [
 function FocusedRoom({
   rt,
   availabilityLabel,
+  stayLabel,
   onClose
 }: {
   rt: RoomTypeWire;
   availabilityLabel?: string;
+  stayLabel?: string;
   onClose: () => void;
 }) {
   const v = roomVisual(rt.slug);
@@ -153,6 +162,7 @@ function FocusedRoom({
             <Chip icon="users" label={`Sleeps ${rt.capacity}`} />
             <Chip icon="bed" label={rt.bedConfig} />
             <Chip icon="eye" label={rt.view} />
+            {stayLabel && <Chip icon="calendar" label={stayLabel} />}
             {availabilityLabel && <Chip icon="check" label={availabilityLabel} accent />}
           </div>
 

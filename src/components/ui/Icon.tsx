@@ -31,6 +31,7 @@ export type IconName =
   | "sparkle"
   | "compass"
   | "maximize"
+  | "bag"
   | "copy";
 
 const PATHS: Record<IconName, JSX.Element> = {
@@ -108,6 +109,12 @@ const PATHS: Record<IconName, JSX.Element> = {
     </>
   ),
   maximize: <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />,
+  bag: (
+    <>
+      <path d="M5 8h14l-1 11a2 2 0 0 1-2 1.8H8A2 2 0 0 1 6 19L5 8z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
+    </>
+  ),
   copy: (
     <>
       <rect x="9" y="9" width="11" height="11" rx="2" />

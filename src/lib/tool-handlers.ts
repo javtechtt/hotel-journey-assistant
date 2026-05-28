@@ -752,14 +752,36 @@ export async function get_room_journey(args: {
   });
   const r = await prisma.reservation.findUnique({
     where: { id: reservationId! },
-    include: { room: true, roomType: true }
+    include: {
+      room: true,
+      roomType: true,
+      orders: { include: { items: true }, orderBy: { createdAt: "asc" } },
+      messages: { include: { replies: true }, orderBy: { createdAt: "asc" } }
+    }
   });
+
+  const pendingOrders = r!.orders.filter(
+    (o) => o.status !== "DELIVERED" && o.status !== "CANCELLED"
+  ).length;
+  const openMessages = r!.messages.filter((m) => m.status === "OPEN").length;
 
   return ok({
     reservation_code: r!.code,
     guest_name: r!.guestName,
     room_number: r!.room?.number ?? null,
     room_type: r!.roomType.name,
+    pending_orders: pendingOrders,
+    open_messages: openMessages,
+    orders: r!.orders.map((o) => ({
+      status: o.status,
+      total_usd: o.totalCents / 100,
+      items: o.items.map((i) => ({ name: i.name, quantity: i.quantity }))
+    })),
+    messages: r!.messages.map((m) => ({
+      body: m.body,
+      status: m.status,
+      replies: m.replies.map((rep) => ({ body: rep.body, from_staff: rep.fromStaff }))
+    })),
     events: events.map((e) => ({
       kind: e.kind,
       label: e.label,

@@ -7,7 +7,6 @@ export type JourneyStepKey =
   | "welcome"
   | "discovery"
   | "roomDetail"
-  | "availability"
   | "checkout"
   | "confirmed"
   | "concierge";
@@ -16,7 +15,6 @@ const STEPS: { key: JourneyStepKey; label: string }[] = [
   { key: "welcome", label: "Arrive" },
   { key: "discovery", label: "Discover" },
   { key: "roomDetail", label: "Room" },
-  { key: "availability", label: "Dates" },
   { key: "checkout", label: "Checkout" },
   { key: "confirmed", label: "Confirmed" },
   { key: "concierge", label: "Concierge" }

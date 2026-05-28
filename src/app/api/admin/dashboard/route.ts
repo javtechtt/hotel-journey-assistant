@@ -76,6 +76,7 @@ export async function GET(req: Request) {
     orders: orders.map((o) => ({
       id: o.id,
       room_number: o.roomNumber,
+      reservation_code: o.reservation.code,
       guest_name: o.reservation.guestName,
       status: o.status,
       total_cents: o.totalCents,
@@ -90,6 +91,7 @@ export async function GET(req: Request) {
     messages: messages.map((m) => ({
       id: m.id,
       room_number: m.roomNumber,
+      reservation_code: m.reservation.code,
       guest_name: m.reservation.guestName,
       body: m.body,
       status: m.status,
