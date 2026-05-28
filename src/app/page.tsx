@@ -51,14 +51,6 @@ function roomTokens(rt: RoomTypeWire): string[] {
   return toks.length ? toks : [full];
 }
 
-function cardBrand(digits: string): string | undefined {
-  if (/^4/.test(digits)) return "Visa";
-  if (/^5[1-5]/.test(digits)) return "Mastercard";
-  if (/^3[47]/.test(digits)) return "Amex";
-  if (/^6/.test(digits)) return "Discover";
-  return digits ? "Card" : undefined;
-}
-
 export default function CustomerPage() {
   const [stage, setStage] = useState<Stage>("welcome");
   const [rooms, setRooms] = useState<RoomTypeWire[]>([]);
@@ -75,7 +67,6 @@ export default function CustomerPage() {
   const [amenitiesOpen, setAmenitiesOpen] = useState(false);
   // Voice-collected payment details (display-only; never stored server-side).
   const [paymentDraft, setPaymentDraft] = useState<PaymentPrefill>({});
-  const paymentDraftRef = useRef<PaymentPrefill>({});
   // Live snapshot of the journey so the agent can resume via get_session_state
   // after the guest pauses/resumes the voice session — state is never reset by
   // stopping the audio, and is read from this store rather than guessed.
@@ -287,7 +278,6 @@ export default function CustomerPage() {
               expiry: call.arguments.expiry as string | undefined,
               cvv: call.arguments.cvv as string | undefined
             };
-            paymentDraftRef.current = draft;
             setPaymentDraft(draft);
             break;
           }
@@ -351,24 +341,22 @@ export default function CustomerPage() {
               setAvailability(null);
               setAmenitiesOpen(false);
               setPaymentDraft({});
-              paymentDraftRef.current = {};
               setStage("discovery");
             }
             break;
           case "confirm_checkout":
             if (d) {
               setIsProcessingCheckout(true);
-              const digits = (paymentDraftRef.current.card_number || "").replace(/\D/g, "");
-              const last4 = digits.slice(-4) || d.card_last4;
-              const brand = cardBrand(digits) || d.card_brand;
+              // Use the server-stored card metadata so the receipt matches the
+              // admin/payment record exactly.
               setReservation((prev) =>
                 prev
                   ? {
                       ...prev,
                       status: "CONFIRMED",
                       room_number: d.room_number,
-                      card_brand: brand,
-                      card_last4: last4
+                      card_brand: d.card_brand,
+                      card_last4: d.card_last4
                     }
                   : prev
               );

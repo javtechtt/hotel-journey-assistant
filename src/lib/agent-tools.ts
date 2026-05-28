@@ -189,11 +189,13 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
     type: "function",
     name: "confirm_checkout",
     description:
-      "What: completes checkout for a reservation_code — authorizes payment and assigns the room; returns the room number and booking receipt. When: the guest says to confirm or complete the booking.",
+      "What: completes checkout for a reservation_code — authorizes payment and assigns the room; returns the room number and booking receipt. When: the guest says to confirm or complete the booking. Note: also pass the card's last four digits (card_last4) and brand (card_brand) so the receipt and admin records match — NEVER pass the full card number or security code.",
     parameters: {
       type: "object",
       properties: {
-        reservation_code: { type: "string" }
+        reservation_code: { type: "string" },
+        card_last4: { type: "string", description: "The last four digits of the card only (e.g. '4242')." },
+        card_brand: { type: "string", description: "Card brand, e.g. Visa, Mastercard, Amex." }
       },
       required: ["reservation_code"],
       additionalProperties: false
@@ -264,20 +266,6 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
         body: { type: "string" }
       },
       required: ["reservation_code", "body"],
-      additionalProperties: false
-    }
-  },
-  {
-    type: "function",
-    name: "get_reservation_journey",
-    description:
-      "What: returns the journey timeline for a reservation_code. When: you need the guest's history.",
-    parameters: {
-      type: "object",
-      properties: {
-        reservation_code: { type: "string" }
-      },
-      required: ["reservation_code"],
       additionalProperties: false
     }
   }

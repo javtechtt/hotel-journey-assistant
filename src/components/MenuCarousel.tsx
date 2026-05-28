@@ -8,6 +8,20 @@ const CARD_W = 132;
 
 // A 3D cylinder carousel of menu items that auto-rotates. Hovering pauses it.
 export function MenuCarousel({ menu }: { menu: MenuItemWire[] }) {
+  if (menu.length === 0) {
+    return (
+      <div className="grid h-full min-h-[340px] place-items-center">
+        <div className="glass max-w-sm rounded-[2rem] px-8 py-10 text-center">
+          <div className="text-[10px] uppercase tracking-luxe text-gold-200/70">Concierge</div>
+          <h3 className="mt-3 font-display text-2xl text-sand-100">The menu is being prepared</h3>
+          <p className="mt-3 text-sm text-sand-100/70">Please check back in a moment.</p>
+          <p className="mt-6 text-[10px] uppercase tracking-[0.2em] text-white/25">
+            Menu unavailable — seed the database
+          </p>
+        </div>
+      </div>
+    );
+  }
   const n = Math.max(menu.length, 1);
   const angle = 360 / n;
   // Radius that keeps cards from overlapping on the ring.

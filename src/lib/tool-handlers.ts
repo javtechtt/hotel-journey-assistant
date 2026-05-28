@@ -673,25 +673,6 @@ export async function send_lobby_message(
   });
 }
 
-export async function get_reservation_journey(args: { reservation_code: string }) {
-  const r = await prisma.reservation.findUnique({
-    where: { code: args.reservation_code }
-  });
-  if (!r) return fail("Reservation not found.");
-  const events = await prisma.journeyEvent.findMany({
-    where: { reservationId: r.id },
-    orderBy: { createdAt: "asc" }
-  });
-  return ok({
-    reservation_code: r.code,
-    events: events.map((e) => ({
-      kind: e.kind,
-      label: e.label,
-      at: e.createdAt.toISOString()
-    }))
-  });
-}
-
 // -------- Admin tools --------
 
 export async function get_admin_dashboard() {
@@ -880,8 +861,7 @@ export const CUSTOMER_HANDLERS = {
   confirm_checkout,
   get_menu_items,
   place_room_service_order,
-  send_lobby_message,
-  get_reservation_journey
+  send_lobby_message
 } as const;
 
 export const ADMIN_HANDLERS = {

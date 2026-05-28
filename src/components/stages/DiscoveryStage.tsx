@@ -54,24 +54,37 @@ export function DiscoveryStage({
       </div>
 
       {/* bento gallery — every room type, fits one screen */}
-      <div
-        className={cn(
-          "grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3 transition-all duration-500 sm:grid-cols-4 sm:gap-4",
-          showFocus && "scale-[0.97] blur-[14px] brightness-[0.4] pointer-events-none"
-        )}
-      >
-        {rooms.map((rt, i) => (
-          <div key={rt.slug} className={cn("min-h-0", rooms.length === 4 ? BENTO[i] : "")}>
-            <RoomCard
-              rt={rt}
-              fill
-              active={!showFocus && focusedSlug === rt.slug}
-              highlight={!showFocus && highlightSlug === rt.slug}
-              onSelect={() => onSelect(rt.slug)}
-            />
+      {rooms.length === 0 ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="glass max-w-md rounded-[2rem] px-10 py-12 text-center">
+            <div className="text-[10px] uppercase tracking-luxe text-gold-200/70">The collection</div>
+            <h3 className="mt-3 font-display text-3xl text-sand-100">Our suites are being prepared</h3>
+            <p className="mt-3 text-sm text-sand-100/70">Please check back in a moment.</p>
+            <p className="mt-6 text-[10px] uppercase tracking-[0.2em] text-white/25">
+              Room catalog unavailable — seed the database
+            </p>
           </div>
-        ))}
-      </div>
+        </div>
+      ) : (
+        <div
+          className={cn(
+            "grid min-h-0 flex-1 grid-cols-2 grid-rows-2 gap-3 transition-all duration-500 sm:grid-cols-4 sm:gap-4",
+            showFocus && "scale-[0.97] blur-[14px] brightness-[0.4] pointer-events-none"
+          )}
+        >
+          {rooms.map((rt, i) => (
+            <div key={rt.slug} className={cn("min-h-0", rooms.length === 4 ? BENTO[i] : "")}>
+              <RoomCard
+                rt={rt}
+                fill
+                active={!showFocus && focusedSlug === rt.slug}
+                highlight={!showFocus && highlightSlug === rt.slug}
+                onSelect={() => onSelect(rt.slug)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* bokeh focus overlay — the room the assistant is speaking about */}
       <AnimatePresence>
