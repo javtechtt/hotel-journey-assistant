@@ -1,6 +1,6 @@
 # Maison Solenne · Voice-First Hotel Journey Assistant
 
-A premium, voice-first hotel concierge MVP built with Next.js App Router, TypeScript, Tailwind CSS, Framer Motion, Prisma + SQLite, and the OpenAI Realtime API (`gpt-realtime-2`).
+A premium, voice-first hotel concierge MVP built with Next.js App Router, TypeScript, Tailwind CSS, Framer Motion, Prisma + PostgreSQL, and the OpenAI Realtime API (`gpt-realtime-2`).
 
 The guest never has to type or click through the booking flow — they speak with **Solenne**, the in-room AI concierge. The interface continually animates new state: room cards, availability, the reservation hold, a polished checkout, an animated reservation receipt, room-service orders, and lobby messages. Staff use a separate **Lobby Terminal** at `/admin` with its own admin voice assistant.
 
@@ -9,13 +9,17 @@ The guest never has to type or click through the booking flow — they speak wit
 ```bash
 npm install
 cp .env.example .env.local        # (Windows: copy .env.example .env.local)
-# Edit .env.local and set OPENAI_API_KEY=sk-... (a key with Realtime access)
+# Edit .env.local: set OPENAI_API_KEY=sk-... and your Postgres DATABASE_URL + DIRECT_URL
 
 npx prisma generate
-npx prisma migrate dev --name init
-npm run seed
+npx prisma db push        # creates the tables in your Postgres database
+npm run seed              # loads room types, rooms, and menu items
 npm run dev
 ```
+
+> **Database:** the app uses **PostgreSQL** (Neon, Vercel Postgres, or Supabase all work).
+> Create a database, then put its **pooled** URL in `DATABASE_URL` and its **direct** URL in
+> `DIRECT_URL`. `prisma db push` syncs the schema; `npm run seed` populates it.
 
 Then open:
 
@@ -29,9 +33,11 @@ You will need to grant **microphone permission** in your browser the first time 
 | Variable              | Purpose                                                         |
 | --------------------- | --------------------------------------------------------------- |
 | `OPENAI_API_KEY`      | Server-side only. Used to mint ephemeral Realtime session keys. |
-| `DATABASE_URL`        | Prisma database URL. Defaults to `file:./dev.db` (SQLite).      |
+| `DATABASE_URL`        | Postgres **pooled** connection string (used at runtime).        |
+| `DIRECT_URL`          | Postgres **direct** connection string (used by `prisma db push`).|
 | `NEXT_PUBLIC_APP_URL` | Optional. Public base URL for the app.                          |
 | `ADMIN_PIN`           | PIN that gates `/admin` and admin tools (default `2468`).       |
+| `NEXT_PUBLIC_USE_ROOM_IMAGES` | Set to `1` to use photos in `public/rooms/` over the SVG art. |
 
 The OpenAI API key is **never** sent to the browser. The browser receives only an ephemeral `client_secret` issued by `/api/realtime/customer` or `/api/realtime/admin`, and uses it to negotiate a WebRTC session directly with the OpenAI Realtime endpoint.
 
@@ -40,7 +46,7 @@ The OpenAI API key is **never** sent to the browser. The browser receives only a
 - **Next.js 14** App Router + TypeScript
 - **Tailwind CSS** + custom luxury theme tokens
 - **Framer Motion** for cinematic transitions
-- **Prisma + SQLite** for the local database
+- **Prisma + PostgreSQL** for the database (Neon / Vercel Postgres / Supabase)
 - **OpenAI Realtime API** with model `gpt-realtime-2`
 - **WebRTC** in-browser for audio + the `oai-events` data channel
 
@@ -106,13 +112,33 @@ The wording on screen and from the assistant is always realistic ("Secure checko
 - Room-service orders and lobby messages require a confirmed reservation code; the server verifies status before persisting.
 - Orders are always routed to the room currently assigned to that reservation — a guest cannot order into another room.
 
+## Deploying to Vercel
+
+1. Push to GitHub and import the repo in Vercel.
+2. Create a Postgres database (Neon, Vercel Postgres, or Supabase).
+3. In **Project → Settings → Environment Variables**, add:
+   - `OPENAI_API_KEY`
+   - `DATABASE_URL` (pooled) and `DIRECT_URL` (direct)
+   - `ADMIN_PIN`
+   - `NEXT_PUBLIC_USE_ROOM_IMAGES=1`
+   - `NEXT_PUBLIC_APP_URL` = your `https://…vercel.app` URL
+   - optional: `OPENAI_REALTIME_MODEL`, `OPENAI_REALTIME_VOICE`, `OPENAI_REALTIME_SPEED`
+4. Sync the schema and seed once (run locally with `.env` pointed at the prod DB, or from a one-off shell):
+   ```bash
+   npx prisma db push
+   npm run seed
+   ```
+5. Deploy. `postinstall` runs `prisma generate` automatically; API routes use the Node runtime (required for Prisma). HTTPS is automatic, so the mic, WebRTC, and copy-to-clipboard all work.
+
+> Note: a public URL means anyone can open `/` and start a (billed) OpenAI Realtime session. Add a gate or rate limit before sharing widely.
+
 ## What's internally simulated
 
 This is an MVP. The following are intentionally lightweight or simulated:
 
 - **Payments**: no real processor — checkout is internally approved, no sensitive card data is stored.
-- **Realtime model**: configured to `gpt-realtime-2`. If your account does not yet have access, change the model in `src/app/api/realtime/*/route.ts`.
+- **Realtime model**: defaults to `gpt-realtime-2`. If your account uses a different id, set `OPENAI_REALTIME_MODEL` (e.g. `gpt-realtime`).
 - **Auth**: a single `ADMIN_PIN` gates the admin terminal. There is no per-user auth or guest account system.
 - **Refresh**: client UIs poll the API every ~4 seconds. A production deployment would use websockets or server-sent events.
 
-Everything else — the booking journey, reservation persistence, room assignment, room-service orders, lobby messaging, journey logging, and the dual voice agents — is fully wired up and runs against the local SQLite database.
+Everything else — the booking journey, reservation persistence, room assignment, room-service orders, lobby messaging, journey logging, and the dual voice agents — is fully wired up and runs against PostgreSQL.
