@@ -19,7 +19,8 @@ dev.db
 prisma/dev.db
 
 # local tooling & references
-.claude/
+.claude/*
+!.claude/project_guidelines.md
 /references/
 
 # misc

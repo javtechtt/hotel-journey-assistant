@@ -33,6 +33,7 @@ You will need to grant **microphone permission** in your browser the first time 
 | Variable              | Purpose                                                         |
 | --------------------- | --------------------------------------------------------------- |
 | `OPENAI_API_KEY`      | Server-side only. Used to mint ephemeral Realtime session keys. |
+| `OPENAI_REALTIME_MODEL` | Realtime model id. Optional; defaults to `gpt-realtime-2`.    |
 | `DATABASE_URL`          | Postgres **pooled** connection string (used at runtime).        |
 | `DATABASE_URL_UNPOOLED` | Postgres **direct** connection string (used by `prisma db push`). Neon's native name. |
 | `NEXT_PUBLIC_APP_URL` | Optional. Public base URL for the app.                          |
@@ -142,3 +143,33 @@ This is an MVP. The following are intentionally lightweight or simulated:
 - **Refresh**: client UIs poll the API every ~4 seconds. A production deployment would use websockets or server-sent events.
 
 Everything else — the booking journey, reservation persistence, room assignment, room-service orders, lobby messaging, journey logging, and the dual voice agents — is fully wired up and runs against PostgreSQL.
+
+## Demo preflight checklist
+
+Run through this immediately before any client demo:
+
+- [ ] Latest `main` is deployed (Vercel auto-deploys on push, or Deployments → ⋯ → Redeploy).
+- [ ] Production URL shows the latest visual markers: the **3D concierge carousel** and the **breathing edge glows** that react to the voice.
+- [ ] `OPENAI_REALTIME_MODEL` is set in Vercel (or the default `gpt-realtime-2` is available to the account).
+- [ ] `OPENAI_API_KEY` is set in Vercel (server-side only).
+- [ ] `DATABASE_URL` (pooled) and `DATABASE_URL_UNPOOLED` (direct) are set; run `npx prisma db push` + `npm run seed` if the database is empty.
+- [ ] Do one full voice booking end-to-end on the production URL (browse → room → dates → checkout → confirm).
+- [ ] Grant microphone permission in the browser **before** the client is watching.
+- [ ] Open `/admin` and confirm the booking, its order, and its message appear.
+
+## MVP configuration notes
+
+- **Realtime model** is configurable via `OPENAI_REALTIME_MODEL` (default `gpt-realtime-2`). If a session fails, the error chip shows the exact OpenAI message without exposing the key.
+- **Menu photos** are drop-in: place `public/menu/<slug>.webp` (slugs: `breakfast-tray`, `espresso`, `tropical-juice`, `dinner-plate`, `wine-pairing`, `garden-mocktail`, `extra-towels`, `housekeeping`, `airport-shuttle`, `spa-appointment`) and set `NEXT_PUBLIC_USE_ROOM_IMAGES=1`. Missing photos fall back to the built-in SVG illustrations — no broken images.
+- **Live refresh** uses ~4s client polling. This is acceptable for the MVP; a production build would use websockets / server-sent events.
+- **Hotel identity & timezone** (Maison Solenne, `Europe/Paris`) are hardcoded as demo config; externalize per-property for production.
+
+## Recommended post-demo tests
+
+No test framework is wired up yet (to keep the MVP lean). After the demo, add unit tests for the core business invariants in `src/lib/tool-handlers.ts`:
+
+- availability overlap (no double-booking across overlapping date ranges)
+- reservation hold → confirm assigns a free room
+- duplicate `confirm_checkout` is idempotent (returns the existing room, no second charge)
+- `place_room_service_order` rejected without a confirmed reservation, and routed to the assigned room
+- `send_lobby_message` rejected without a confirmed reservation
