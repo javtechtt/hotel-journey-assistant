@@ -63,6 +63,12 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   const followupQueuedRef = useRef(false);
   // True while the guest is speaking (used to detect/handle barge-in).
   const userSpeakingRef = useRef(false);
+  // Mic gating: the guest's manual mute, plus a brief auto-mute at the start of
+  // each spoken reply so the speaker's onset can't self-trigger the VAD.
+  const userMutedRef = useRef(false);
+  const autoMutedRef = useRef(false);
+  const autoMuteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const audioMuteRespRef = useRef<string | null>(null);
 
   // Request a follow-up response after tool output(s). If a response is still
   // streaming, defer until response.done; otherwise fire immediately. A short
@@ -119,6 +125,20 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
         assistantBufRef.current.set(id, next);
         setStatus("speaking");
         appendTurn({ id, role: "assistant", text: next, partial: true });
+        // At the start of each spoken reply, mute the mic for ~2s so the
+        // speaker's onset (loudest, before AEC settles) can't self-trigger the
+        // VAD. Barge-in resumes automatically after the window.
+        const rid = event.response_id as string | undefined;
+        if (rid && audioMuteRespRef.current !== rid) {
+          audioMuteRespRef.current = rid;
+          autoMutedRef.current = true;
+          clientRef.current?.setMuted(true);
+          if (autoMuteTimerRef.current) clearTimeout(autoMuteTimerRef.current);
+          autoMuteTimerRef.current = setTimeout(() => {
+            autoMutedRef.current = false;
+            clientRef.current?.setMuted(userMutedRef.current);
+          }, 2000);
+        }
       } else if (
         type === "response.output_audio_transcript.done" ||
         type === "response.audio_transcript.done"
@@ -221,6 +241,12 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     responseActiveRef.current = false;
     followupQueuedRef.current = false;
     userSpeakingRef.current = false;
+    autoMutedRef.current = false;
+    audioMuteRespRef.current = null;
+    if (autoMuteTimerRef.current) {
+      clearTimeout(autoMuteTimerRef.current);
+      autoMuteTimerRef.current = null;
+    }
     processedCallsRef.current.clear();
     meterRef.current?.stop();
     meterRef.current = new AudioMeter((l) => {
@@ -289,6 +315,11 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
     meterRef.current?.stop();
     meterRef.current = null;
     levelRef.current = 0;
+    if (autoMuteTimerRef.current) {
+      clearTimeout(autoMuteTimerRef.current);
+      autoMuteTimerRef.current = null;
+    }
+    autoMutedRef.current = false;
     setStatus("idle");
     setAudioStream(null);
   }, []);
@@ -296,7 +327,9 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
   const toggleMute = useCallback(() => {
     setMuted((m) => {
       const next = !m;
-      clientRef.current?.setMuted(next);
+      userMutedRef.current = next;
+      // Stay muted if either the guest muted or the auto-mute window is active.
+      clientRef.current?.setMuted(next || autoMutedRef.current);
       return next;
     });
   }, []);
@@ -307,6 +340,7 @@ export function useRealtimeVoice(opts: UseRealtimeVoiceOptions) {
       clientRef.current = null;
       meterRef.current?.stop();
       meterRef.current = null;
+      if (autoMuteTimerRef.current) clearTimeout(autoMuteTimerRef.current);
     };
   }, []);
 
