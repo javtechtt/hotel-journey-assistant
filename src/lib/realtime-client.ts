@@ -42,7 +42,16 @@ export class RealtimeClient {
       this.opts.onRemoteAudioTrack?.(remoteStream);
     };
 
-    const mic = await navigator.mediaDevices.getUserMedia({ audio: true });
+    // Enable the browser's acoustic echo cancellation, noise suppression, and
+    // auto-gain so the mic doesn't pick up the agent's own voice from the
+    // device speaker (critical on mobile / speakerphone).
+    const mic = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true
+      }
+    });
     this.localStream = mic;
     mic.getTracks().forEach((t) => pc.addTrack(t, mic));
 

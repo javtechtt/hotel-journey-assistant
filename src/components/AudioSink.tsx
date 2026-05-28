@@ -16,5 +16,5 @@ export function AudioSink({ stream }: { stream: MediaStream | null }) {
       el.srcObject = null;
     }
   }, [stream]);
-  return <audio ref={ref} autoPlay className="voice-sink" />;
+  return <audio ref={ref} autoPlay playsInline className="voice-sink" />;
 }
