@@ -79,9 +79,12 @@ export default function CustomerPage() {
   // Live snapshot of the journey so the agent can resume via get_session_state
   // after the guest pauses/resumes the voice session — state is never reset by
   // stopping the audio, and is read from this store rather than guessed.
-  const stateRef = useRef<{ stage: Stage; reservation: ReservationWire | null; focusedSlug: string | null }>(
-    { stage: "welcome", reservation: null, focusedSlug: null }
-  );
+  const stateRef = useRef<{
+    stage: Stage;
+    reservation: ReservationWire | null;
+    focusedSlug: string | null;
+    hasAvailability: boolean;
+  }>({ stage: "welcome", reservation: null, focusedSlug: null, hasAvailability: false });
   const mentionRef = useRef<{ turnId: string; counts: Record<string, number> }>({
     turnId: "",
     counts: {}
@@ -91,8 +94,8 @@ export default function CustomerPage() {
   // Keep the resume snapshot current so get_session_state always reflects the
   // live screen (read inside the frozen tool dispatcher via the ref).
   useEffect(() => {
-    stateRef.current = { stage, reservation, focusedSlug };
-  }, [stage, reservation, focusedSlug]);
+    stateRef.current = { stage, reservation, focusedSlug, hasAvailability: !!availability };
+  }, [stage, reservation, focusedSlug, availability]);
 
   // Clear any spoken-room highlight when the stage changes, so nothing appears
   // pre-selected on arrival (e.g. a room named during the welcome greeting must
@@ -220,6 +223,29 @@ export default function CustomerPage() {
       };
     }
 
+    // go_to_stage navigates the on-screen view (with guards) so "take me back
+    // to the rooms / checkout / concierge" actually changes the screen.
+    if (call.name === "go_to_stage") {
+      const raw = String((call.arguments as any).stage || "").toLowerCase();
+      const s = stateRef.current;
+      const hold = s.reservation?.status === "HOLD";
+      const confirmed = s.reservation?.status === "CONFIRMED";
+      let dest: Stage | null = null;
+      if (/welcome|start|home|beginning/.test(raw)) dest = "welcome";
+      else if (/concierge|service|lobby|menu|front.?desk|order/.test(raw)) dest = confirmed ? "concierge" : null;
+      else if (/confirm|receipt/.test(raw)) dest = confirmed ? "confirmed" : null;
+      else if (/checkout|payment|\bpay\b/.test(raw)) dest = hold ? "checkout" : null;
+      else if (/avail|date/.test(raw)) dest = s.hasAvailability ? "availability" : null;
+      else if (/detail|selected/.test(raw)) dest = s.focusedSlug ? "roomDetail" : "discovery";
+      else if (/discover|room|browse|collection|gallery|stay/.test(raw)) dest = "discovery";
+      if (dest) {
+        setAmenitiesOpen(false);
+        setStage(dest);
+        return { ok: true, data: { navigated_to: dest } };
+      }
+      return { ok: false, error: "That section isn't available from here yet." };
+    }
+
     const res = await fetch("/api/agent-tool", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -233,9 +259,9 @@ export default function CustomerPage() {
         switch (call.name) {
           case "get_room_options":
             if (d?.room_types) setRooms(d.room_types.map(normalizeRoom));
-            // Only advance from the very start — never yank a guest out of
-            // checkout/confirmed/concierge on reconnect.
-            setStage((s) => (s === "welcome" ? "discovery" : s));
+            // Showing the rooms means going to the discovery gallery.
+            setAmenitiesOpen(false);
+            setStage("discovery");
             break;
           case "get_room_details":
             if (d?.room_type) {

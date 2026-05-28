@@ -20,6 +20,24 @@ export const CUSTOMER_TOOLS: ToolDef[] = [
   },
   {
     type: "function",
+    name: "go_to_stage",
+    description:
+      "Move the on-screen view to a part of the journey when the guest asks to go back to, return to, or jump to it. ALWAYS call this to actually navigate — never claim to have moved them without calling it. Destinations are only reachable when valid (e.g. checkout needs a pending hold, concierge needs a confirmed reservation).",
+    parameters: {
+      type: "object",
+      properties: {
+        stage: {
+          type: "string",
+          description:
+            "Where to go: 'discovery' (browse rooms), 'availability' (dates), 'checkout', 'confirmation', or 'concierge' (room service & front desk)."
+        }
+      },
+      required: ["stage"],
+      additionalProperties: false
+    }
+  },
+  {
+    type: "function",
     name: "get_room_options",
     description:
       "Return the full catalog of room types the hotel offers, with mood, capacity, and nightly rate. Call this near the start of the conversation to show the guest what's available.",
