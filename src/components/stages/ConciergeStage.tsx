@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { CopyCode } from "@/components/CopyCode";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import type { LobbyMessageWire, MenuItemWire, OrderWire, ReservationWire } from "@/lib/wire-types";
@@ -56,8 +57,9 @@ export function ConciergeStage({
           <div className="text-[10px] uppercase tracking-luxe text-gold-200/80">Concierge</div>
           <h2 className="font-display text-3xl text-sand-100 mt-1">At your service</h2>
         </div>
-        <div className="hidden sm:flex items-center gap-2 text-xs text-white/50">
-          <Icon name="key" className="h-4 w-4" /> Room {reservation.room_number} · {reservation.reservation_code}
+        <div className="hidden sm:flex items-center gap-3 text-xs text-white/60">
+          <span>Room {reservation.room_number}</span>
+          <CopyCode code={reservation.reservation_code} className="px-3 py-1.5 text-xs" />
         </div>
       </div>
 

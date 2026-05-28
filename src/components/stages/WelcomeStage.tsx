@@ -13,7 +13,12 @@ export function WelcomeStage() {
       transition={{ duration: 0.9, ease: "easeOut" }}
       className="relative flex h-full items-center justify-center overflow-hidden rounded-[2.5rem]"
     >
-      <RoomScene slug="ocean-view-suite" scrim="full" className="opacity-90" />
+      <RoomScene
+        image="/rooms/luxury-hotel-with-pools.webp"
+        slug="ocean-view-suite"
+        scrim="full"
+        className="opacity-90"
+      />
       <div className="relative z-10 px-6 text-center">
         <motion.div
           initial={{ opacity: 0, y: 16 }}

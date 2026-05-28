@@ -9,9 +9,10 @@ import { AudioSink } from "@/components/AudioSink";
 import { WelcomeStage } from "@/components/stages/WelcomeStage";
 import { DiscoveryStage } from "@/components/stages/DiscoveryStage";
 import { AvailabilityStage } from "@/components/stages/AvailabilityStage";
-import { CheckoutStage } from "@/components/stages/CheckoutStage";
+import { CheckoutStage, type PaymentPrefill } from "@/components/stages/CheckoutStage";
 import { ConfirmationStage } from "@/components/stages/ConfirmationStage";
 import { ConciergeStage } from "@/components/stages/ConciergeStage";
+import { RoomAmenitiesLightbox } from "@/components/RoomAmenitiesLightbox";
 import { useRealtimeVoice, type ToolCallEvent } from "@/lib/use-realtime-voice";
 import { roomVisual } from "@/lib/room-visuals";
 import {
@@ -26,15 +27,19 @@ import {
 
 type Stage = JourneyStepKey;
 
-const STAGE_HINTS: Record<Stage, string> = {
-  welcome: "Tap the orb and say “show me your rooms.”",
-  discovery: "Try “tell me about the ocean view suite.”",
-  roomDetail: "Say “check availability” or “reserve this room.”",
-  availability: "Give me your dates, then say “reserve this.”",
-  checkout: "Say “confirm booking” when you’re ready.",
-  confirmed: "Say “order room service” or “message the lobby.”",
-  concierge: "Try “send two coffees to my room.”"
-};
+// A different atmospheric cue each session so the greeting never sounds scripted.
+const GREETING_FLAVORS = [
+  "a bright, sunlit morning welcome",
+  "a warm golden-afternoon welcome",
+  "a calm, candlelit evening welcome",
+  "a gentle welcome that nods to the sea breeze",
+  "an elegant welcome that notes the hush of the lobby",
+  "an easy, gracious welcome as if to a returning friend"
+];
+function buildGreeting(): string {
+  const flavor = GREETING_FLAVORS[Math.floor(Math.random() * GREETING_FLAVORS.length)];
+  return `As Solenne, give ${flavor} to Maison Solenne in ONE short, poised sentence — brisk, friendly, in fresh wording (never a fixed script), with no audible breaths. Then call get_room_options and, in your own brief words, invite the guest to see what catches their eye. Do not describe or list the rooms, and do not repeat yourself. Then stop and wait.`;
+}
 
 // Distinguishing words for each room type, used to detect when the assistant
 // names a room in its streamed speech. Generic stopwords are dropped.
@@ -43,6 +48,14 @@ function roomTokens(rt: RoomTypeWire): string[] {
   const full = rt.name.toLowerCase();
   const toks = full.split(/\s+/).filter((t) => t.length >= 4 && !KEYWORD_STOP.has(t));
   return toks.length ? toks : [full];
+}
+
+function cardBrand(digits: string): string | undefined {
+  if (/^4/.test(digits)) return "Visa";
+  if (/^5[1-5]/.test(digits)) return "Mastercard";
+  if (/^3[47]/.test(digits)) return "Amex";
+  if (/^6/.test(digits)) return "Discover";
+  return digits ? "Card" : undefined;
 }
 
 export default function CustomerPage() {
@@ -57,6 +70,11 @@ export default function CustomerPage() {
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   // Which room the assistant is currently naming out loud (live highlight).
   const [spokenSlug, setSpokenSlug] = useState<string | null>(null);
+  // Opt-in features & amenities lightbox over the room stage.
+  const [amenitiesOpen, setAmenitiesOpen] = useState(false);
+  // Voice-collected payment details (display-only; never stored server-side).
+  const [paymentDraft, setPaymentDraft] = useState<PaymentPrefill>({});
+  const paymentDraftRef = useRef<PaymentPrefill>({});
   const mentionRef = useRef<{ turnId: string; counts: Record<string, number> }>({
     turnId: "",
     counts: {}
@@ -176,6 +194,34 @@ export default function CustomerPage() {
             if (d?.room_type) {
               setFocusedSlug(d.room_type.slug);
               setStage("roomDetail");
+              setAmenitiesOpen(false);
+            }
+            break;
+          case "show_room_amenities":
+            if (d?.room_type) {
+              setFocusedSlug(d.room_type.slug);
+              setStage("roomDetail");
+              setAmenitiesOpen(true);
+            }
+            break;
+          case "close_room_details":
+            setAmenitiesOpen(false);
+            break;
+          case "set_payment_details": {
+            const draft: PaymentPrefill = {
+              card_name: call.arguments.card_name as string | undefined,
+              card_number: call.arguments.card_number as string | undefined,
+              expiry: call.arguments.expiry as string | undefined,
+              cvv: call.arguments.cvv as string | undefined
+            };
+            paymentDraftRef.current = draft;
+            setPaymentDraft(draft);
+            break;
+          }
+          case "resume_reservation":
+            if (d?.reservation) {
+              setReservation(d.reservation as ReservationWire);
+              setStage("concierge");
             }
             break;
           case "check_availability":
@@ -205,17 +251,51 @@ export default function CustomerPage() {
               setStage("checkout");
             }
             break;
+          case "modify_reservation_hold":
+            if (d) {
+              setReservation({
+                reservation_code: d.reservation_code,
+                guest_name: d.guest_name,
+                room_type: d.room_type,
+                room_type_slug: d.room_type_slug,
+                check_in_date: d.check_in_date,
+                check_out_date: d.check_out_date,
+                nights: d.nights,
+                party_size: d.party_size,
+                nightly_rate_usd: d.nightly_rate_usd,
+                subtotal_usd: d.subtotal_usd,
+                taxes_usd: d.taxes_usd,
+                total_usd: d.total_usd,
+                status: "HOLD"
+              });
+              if (d.room_type_slug) setFocusedSlug(d.room_type_slug);
+              setStage("checkout");
+            }
+            break;
+          case "cancel_reservation":
+            if (d) {
+              setReservation(null);
+              setAvailability(null);
+              setAmenitiesOpen(false);
+              setPaymentDraft({});
+              paymentDraftRef.current = {};
+              setStage("discovery");
+            }
+            break;
           case "confirm_checkout":
             if (d) {
               setIsProcessingCheckout(true);
+              const digits = (paymentDraftRef.current.card_number || "").replace(/\D/g, "");
+              const last4 = digits.slice(-4) || d.card_last4;
+              const brand = cardBrand(digits) || d.card_brand;
               setReservation((prev) =>
                 prev
                   ? {
                       ...prev,
                       status: "CONFIRMED",
                       room_number: d.room_number,
-                      card_brand: d.card_brand,
-                      card_last4: d.card_last4
+                      card_brand: brand,
+                      card_last4: last4
                     }
                   : prev
               );
@@ -238,12 +318,23 @@ export default function CustomerPage() {
     return body;
   }, []);
 
+  const initialGreeting = useMemo(buildGreeting, []);
+
   const voice = useRealtimeVoice({
     agent: "customer",
-    initialGreeting:
-      "Warmly welcome the guest to Maison Solenne as Solenne — bright, friendly, and unhurried but lively, one or two short sentences that make them feel looked-after. Then call get_room_options and invite them to explore, mentioning two or three styles by name with a touch of charm.",
+    initialGreeting,
     onToolCall
   });
+
+  const focusedRoom = useMemo(
+    () => rooms.find((r) => r.slug === focusedSlug) ?? null,
+    [rooms, focusedSlug]
+  );
+
+  // The details lightbox only belongs on the room stage.
+  useEffect(() => {
+    if (stage !== "roomDetail") setAmenitiesOpen(false);
+  }, [stage]);
 
   const availabilityLabelForFocused = useMemo(() => {
     if (!availability || !focusedSlug) return undefined;
@@ -305,6 +396,11 @@ export default function CustomerPage() {
     return () => clearTimeout(t);
   }, [voice.status]);
 
+  // Note: room selection is driven ONLY by tool calls (get_room_details /
+  // show_room_amenities) — the system is the source of truth. The spoken-word
+  // heuristic is used solely for the transient highlight on the discovery
+  // gallery, never to change the showcased room.
+
   // Local (clickable) navigation that mirrors the voice journey for testing.
   const selectRoomLocally = useCallback((slug: string) => {
     setFocusedSlug(slug);
@@ -328,7 +424,7 @@ export default function CustomerPage() {
       </div>
 
       {/* stage area — fills the remaining height; no page scroll */}
-      <div className="relative z-10 mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col px-4 pb-40 pt-4 lg:px-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-6xl min-h-0 flex-1 flex-col px-4 pb-44 pt-4 sm:pb-40 lg:px-8">
         <AnimatePresence mode="wait">
           {stage === "welcome" && <WelcomeStage key="welcome" />}
 
@@ -350,7 +446,12 @@ export default function CustomerPage() {
           )}
 
           {stage === "checkout" && reservation && (
-            <CheckoutStage key="checkout" reservation={reservation} isProcessing={isProcessingCheckout} />
+            <CheckoutStage
+              key="checkout"
+              reservation={reservation}
+              isProcessing={isProcessingCheckout}
+              prefill={paymentDraft}
+            />
           )}
 
           {stage === "confirmed" && reservation && (
@@ -373,12 +474,16 @@ export default function CustomerPage() {
         </AnimatePresence>
       </div>
 
+      <AnimatePresence>
+        {amenitiesOpen && focusedRoom && (
+          <RoomAmenitiesLightbox rt={focusedRoom} onClose={() => setAmenitiesOpen(false)} />
+        )}
+      </AnimatePresence>
+
       <VoiceDock
         status={voice.status}
         error={voice.error}
-        transcript={voice.transcript}
         muted={voice.muted}
-        hint={STAGE_HINTS[stage]}
         onStart={voice.start}
         onStop={voice.stop}
         onToggleMute={voice.toggleMute}

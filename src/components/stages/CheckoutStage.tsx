@@ -7,20 +7,51 @@ import { RoomScene } from "@/components/art/RoomScene";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { ReservationWire } from "@/lib/wire-types";
 
-// Realistic, client-ready secure checkout. Card fields are visual only —
-// they are never submitted to the server, sent to OpenAI, or logged.
+function formatCardNumber(v: string) {
+  return v
+    .replace(/[^0-9]/g, "")
+    .slice(0, 16)
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+}
+
+export type PaymentPrefill = {
+  card_name?: string;
+  card_number?: string;
+  expiry?: string;
+  cvv?: string;
+};
+
+// Realistic, client-ready secure checkout. Fields start empty — the guest
+// provides their details (by voice, via set_payment_details, or by typing).
+// Card values are never submitted to our server, sent to OpenAI, or stored.
 export function CheckoutStage({
   reservation,
-  isProcessing
+  isProcessing,
+  prefill
 }: {
   reservation: ReservationWire;
   isProcessing: boolean;
+  prefill?: PaymentPrefill;
 }) {
-  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
-  const [expiry, setExpiry] = useState("12 / 29");
-  const [cvv, setCvv] = useState("123");
-  const [name, setName] = useState(reservation.guest_name);
-  useEffect(() => setName(reservation.guest_name), [reservation.guest_name]);
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiry, setExpiry] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [name, setName] = useState("");
+
+  // Fill from voice-collected details when they arrive.
+  useEffect(() => {
+    if (prefill?.card_name != null) setName(prefill.card_name);
+  }, [prefill?.card_name]);
+  useEffect(() => {
+    if (prefill?.card_number != null) setCardNumber(formatCardNumber(prefill.card_number));
+  }, [prefill?.card_number]);
+  useEffect(() => {
+    if (prefill?.expiry != null) setExpiry(prefill.expiry);
+  }, [prefill?.expiry]);
+  useEffect(() => {
+    if (prefill?.cvv != null) setCvv(prefill.cvv.replace(/[^0-9]/g, "").slice(0, 4));
+  }, [prefill?.cvv]);
 
   return (
     <motion.section
@@ -99,7 +130,7 @@ export function CheckoutStage({
             >
               <Icon name={isProcessing ? "card" : "mic"} className="h-5 w-5 text-gold-200" />
               <div className="text-sm text-sand-100">
-                {isProcessing ? "Authorizing payment…" : "Say “confirm booking” to complete checkout"}
+                {isProcessing ? "Authorizing payment…" : "Share your payment details, then say “confirm booking”"}
               </div>
             </motion.div>
           </div>

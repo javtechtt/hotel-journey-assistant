@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { RoomScene } from "@/components/art/RoomScene";
 import { Icon, type IconName } from "@/components/ui/Icon";
+import { CopyCode } from "@/components/CopyCode";
 import { formatDate, formatMoney } from "@/lib/format";
 import type { ReservationWire } from "@/lib/wire-types";
 
@@ -52,7 +53,7 @@ export function ConfirmationStage({
         </motion.div>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-3 text-sm">
-          <Pill icon="key" label={reservation.reservation_code} />
+          <CopyCode code={reservation.reservation_code} />
           <Pill icon="bed" label={reservation.room_type} />
           <Pill
             icon="calendar"

@@ -30,7 +30,8 @@ export type IconName =
   | "moon"
   | "sparkle"
   | "compass"
-  | "maximize";
+  | "maximize"
+  | "copy";
 
 const PATHS: Record<IconName, JSX.Element> = {
   mic: (
@@ -106,7 +107,13 @@ const PATHS: Record<IconName, JSX.Element> = {
       <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" />
     </>
   ),
-  maximize: <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />
+  maximize: <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M3 16v3a2 2 0 0 0 2 2h3" />,
+  copy: (
+    <>
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+    </>
+  )
 };
 
 export function Icon({

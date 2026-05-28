@@ -355,9 +355,7 @@ export default function AdminPage() {
       <VoiceDock
         status={voice.status}
         error={voice.error}
-        transcript={voice.transcript}
         muted={voice.muted}
-        hint="Try “summarize active stays” or “mark the latest order delivered.”"
         onStart={voice.start}
         onStop={voice.stop}
         onToggleMute={voice.toggleMute}

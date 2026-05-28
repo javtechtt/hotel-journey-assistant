@@ -1,7 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/cn";
 import { roomVisual, type RoomSceneKey } from "@/lib/room-visuals";
+
+// When NEXT_PUBLIC_USE_ROOM_IMAGES=1, real photos at /public/rooms/<slug>.jpg
+// are layered over the artwork. If a photo is missing it falls back silently
+// to the built-in SVG scene.
+const USE_ROOM_IMAGES = process.env.NEXT_PUBLIC_USE_ROOM_IMAGES === "1";
+// Tried in order; first one that loads wins, otherwise fall back to the SVG.
+const PHOTO_EXTS = ["webp", "jpg", "jpeg", "png"];
 
 // Cinematic, emoji-free procedural artwork per room type. Rendered as a
 // full-bleed SVG "image treatment" with gradient, light, grain and vignette.
@@ -139,19 +147,37 @@ const SCENES: Record<RoomSceneKey, () => JSX.Element> = {
 
 export function RoomScene({
   slug,
+  image,
   className,
   scrim = "full"
 }: {
   slug?: string | null;
+  /** Explicit photo path (e.g. a hero image) — overrides the slug lookup. */
+  image?: string;
   className?: string;
   scrim?: "full" | "bottom" | "none";
 }) {
   const v = roomVisual(slug);
   const Scene = SCENES[v.scene];
+  const [extIdx, setExtIdx] = useState(0);
+  const showPhoto = USE_ROOM_IMAGES && (!!image || !!slug) && extIdx < PHOTO_EXTS.length;
+  const photoSrc = image ?? `/rooms/${slug}.${PHOTO_EXTS[extIdx]}`;
   return (
     <div className={cn("absolute inset-0 overflow-hidden", className)}>
       <div className={cn("absolute inset-0 bg-gradient-to-br", v.gradient)} />
       <Scene />
+      {showPhoto && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          key={photoSrc}
+          src={photoSrc}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          onError={() => setExtIdx((i) => (image ? PHOTO_EXTS.length : i + 1))}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
       {scrim !== "none" && (
         <div className={cn("absolute inset-0", scrim === "full" ? "scrim-full" : "scrim-b")} />
       )}
