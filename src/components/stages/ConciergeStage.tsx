@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CopyCode } from "@/components/CopyCode";
-import { MenuItemImage } from "@/components/MenuItemImage";
+import { MenuCarousel } from "@/components/MenuCarousel";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import type { LobbyMessageWire, MenuItemWire, OrderWire, ReservationWire } from "@/lib/wire-types";
@@ -48,27 +48,9 @@ export function ConciergeStage({
       </div>
 
       <div className="grid min-h-0 flex-1 gap-6 lg:grid-cols-[1.5fr,1fr]">
-        {/* room service menu — dominant */}
-        <div className="grid min-h-0 auto-rows-min grid-cols-2 gap-3 overflow-y-auto scrollbar-thin pr-1 sm:grid-cols-3">
-          {menu.map((m) => (
-            <motion.div
-              key={m.slug}
-              whileHover={{ y: -4 }}
-              className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]"
-            >
-              <MenuItemImage slug={m.slug} category={m.category} className="h-24 w-full" />
-              <div className="p-4">
-                <div className="font-display text-base leading-tight text-sand-100">{m.name}</div>
-                <div className="mt-2 text-sm">
-                  {m.price_usd > 0 ? (
-                    <span className="text-gold">{formatMoney(m.price_usd * 100)}</span>
-                  ) : (
-                    <span className="text-teal-200/80 text-xs uppercase tracking-widest">Complimentary</span>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          ))}
+        {/* room service menu — 3D rotating carousel */}
+        <div className="min-h-0">
+          <MenuCarousel menu={menu} />
         </div>
 
         {/* right rail: orders + lobby */}

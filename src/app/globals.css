@@ -153,4 +153,24 @@ body {
 
 .tracking-luxe { letter-spacing: 0.42em; }
 
+/* ---------- 3D menu carousel ---------- */
+@keyframes carousel-spin {
+  from { transform: rotateY(0deg); }
+  to { transform: rotateY(360deg); }
+}
+.carousel-ring {
+  animation: carousel-spin 34s linear infinite;
+  will-change: transform;
+}
+.carousel:hover .carousel-ring {
+  animation-play-state: paused;
+}
+.carousel-card {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .carousel-ring { animation: none; }
+}
+
 audio.voice-sink { display: none; }
