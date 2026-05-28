@@ -13,6 +13,13 @@ export type ToolDef = {
 export const CUSTOMER_TOOLS: ToolDef[] = [
   {
     type: "function",
+    name: "get_session_state",
+    description:
+      "Return where the guest currently is in their journey and any active reservation. Call this at the START of every connection (including after the guest pauses and resumes the voice session) so you continue from the live on-screen state instead of starting over. This is the source of truth for the current state — do not assume or reset it yourself.",
+    parameters: { type: "object", properties: {}, additionalProperties: false }
+  },
+  {
+    type: "function",
     name: "get_room_options",
     description:
       "Return the full catalog of room types the hotel offers, with mood, capacity, and nightly rate. Call this near the start of the conversation to show the guest what's available.",

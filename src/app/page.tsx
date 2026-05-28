@@ -38,7 +38,7 @@ const GREETING_FLAVORS = [
 ];
 function buildGreeting(): string {
   const flavor = GREETING_FLAVORS[Math.floor(Math.random() * GREETING_FLAVORS.length)];
-  return `As Solenne, give ${flavor} to Maison Solenne in ONE short, poised sentence — brisk, friendly, in fresh wording (never a fixed script), with no audible breaths. Then call get_room_options and, in your own brief words, invite the guest to see what catches their eye. Do not describe or list the rooms, and do not repeat yourself. Then stop and wait.`;
+  return `As Solenne, FIRST call get_session_state to see where the guest is. If they are just arriving (no reservation, at the very start), give ${flavor} to Maison Solenne in one short, fresh sentence, then call get_room_options and invite them to explore (don't describe the rooms). If they are already mid-journey, do NOT greet from scratch or restart — briefly pick up exactly where they are, per your resume guidance. No audible breaths; then stop and wait.`;
 }
 
 // Distinguishing words for each room type, used to detect when the assistant
@@ -75,11 +75,23 @@ export default function CustomerPage() {
   // Voice-collected payment details (display-only; never stored server-side).
   const [paymentDraft, setPaymentDraft] = useState<PaymentPrefill>({});
   const paymentDraftRef = useRef<PaymentPrefill>({});
+  // Live snapshot of the journey so the agent can resume via get_session_state
+  // after the guest pauses/resumes the voice session — state is never reset by
+  // stopping the audio, and is read from this store rather than guessed.
+  const stateRef = useRef<{ stage: Stage; reservation: ReservationWire | null; focusedSlug: string | null }>(
+    { stage: "welcome", reservation: null, focusedSlug: null }
+  );
   const mentionRef = useRef<{ turnId: string; counts: Record<string, number> }>({
     turnId: "",
     counts: {}
   });
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Keep the resume snapshot current so get_session_state always reflects the
+  // live screen (read inside the frozen tool dispatcher via the ref).
+  useEffect(() => {
+    stateRef.current = { stage, reservation, focusedSlug };
+  }, [stage, reservation, focusedSlug]);
 
   // ---- Initial room catalog (visual richness before voice connects) ----
   useEffect(() => {
@@ -175,6 +187,30 @@ export default function CustomerPage() {
 
   // ---- Server-side tool execution + visual state choreography ----
   const onToolCall = useCallback(async (call: ToolCallEvent) => {
+    // get_session_state is answered locally from the live snapshot — it is the
+    // source of truth for where the guest is, so the agent resumes (never
+    // resets) after the voice session is paused and reconnected.
+    if (call.name === "get_session_state") {
+      const s = stateRef.current;
+      return {
+        ok: true,
+        data: {
+          stage: s.stage,
+          has_reservation: !!s.reservation,
+          reservation: s.reservation
+            ? {
+                reservation_code: s.reservation.reservation_code,
+                guest_name: s.reservation.guest_name,
+                room_type: s.reservation.room_type,
+                status: s.reservation.status,
+                room_number: s.reservation.room_number ?? null
+              }
+            : null,
+          focused_room: s.focusedSlug ?? null
+        }
+      };
+    }
+
     const res = await fetch("/api/agent-tool", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -188,7 +224,9 @@ export default function CustomerPage() {
         switch (call.name) {
           case "get_room_options":
             if (d?.room_types) setRooms(d.room_types.map(normalizeRoom));
-            setStage((s) => (s === "welcome" || s === "concierge" ? "discovery" : s));
+            // Only advance from the very start — never yank a guest out of
+            // checkout/confirmed/concierge on reconnect.
+            setStage((s) => (s === "welcome" ? "discovery" : s));
             break;
           case "get_room_details":
             if (d?.room_type) {
