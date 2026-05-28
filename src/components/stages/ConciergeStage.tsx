@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Icon, type IconName } from "@/components/ui/Icon";
 import { CopyCode } from "@/components/CopyCode";
+import { MenuItemImage } from "@/components/MenuItemImage";
 import { cn } from "@/lib/cn";
 import { formatMoney } from "@/lib/format";
 import type { LobbyMessageWire, MenuItemWire, OrderWire, ReservationWire } from "@/lib/wire-types";
@@ -76,18 +77,18 @@ export function ConciergeStage({
             <motion.div
               key={m.slug}
               whileHover={{ y: -4 }}
-              className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03] p-5"
+              className="group relative overflow-hidden rounded-2xl border border-white/8 bg-white/[0.03]"
             >
-              <div className="mb-4 grid h-11 w-11 place-items-center rounded-xl bg-gold-500/12 text-gold-200">
-                <Icon name={itemIcon(m)} className="h-5 w-5" />
-              </div>
-              <div className="font-display text-lg leading-tight text-sand-100">{m.name}</div>
-              <div className="mt-3 text-sm">
-                {m.price_usd > 0 ? (
-                  <span className="text-gold">{formatMoney(m.price_usd * 100)}</span>
-                ) : (
-                  <span className="text-teal-200/80 text-xs uppercase tracking-widest">Complimentary</span>
-                )}
+              <MenuItemImage slug={m.slug} icon={itemIcon(m)} className="h-24 w-full" />
+              <div className="p-4">
+                <div className="font-display text-base leading-tight text-sand-100">{m.name}</div>
+                <div className="mt-2 text-sm">
+                  {m.price_usd > 0 ? (
+                    <span className="text-gold">{formatMoney(m.price_usd * 100)}</span>
+                  ) : (
+                    <span className="text-teal-200/80 text-xs uppercase tracking-widest">Complimentary</span>
+                  )}
+                </div>
               </div>
             </motion.div>
           ))}
